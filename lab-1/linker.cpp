@@ -1,19 +1,27 @@
 #include <iostream>
 #include <fstream>
 #include <string.h>
+#include <regex>
+#include <vector>
+#include <unordered_map>
 
 using namespace std;
 
+
 ifstream input;
-int line_inedx;
+int line_index;
 int line_offset;
 int module_index;
+int module_base;
+int num_instruction;
 string line_str;
 char * line;
 char * token;
+vector<string> symbolVec;
+unordered_map<string, int> symbolTable;
 
 
-void _parseError(int err_code, int line_num, int line_offset) {
+void _parseError(int err_code, int line_index, int line_offset) {
     static const char* err_str [] = {
         "NUM_EXPECTED",             // Number expect, anything >= 2^30 is not a number either
         "SYM_EXPECTED",             // Symbol Expected
@@ -23,7 +31,7 @@ void _parseError(int err_code, int line_num, int line_offset) {
         "TOO_MANY_USE_IN_MODULE",   // >16
         "TOO_MANY_INSTR",           // Total num_instr exceeds memory size (512)
     };
-    cout << "Parse Error line " << line_num << " offset " << line_offset << ": " << err_str[err_code] << endl;
+    cout << "Parse Error line " << line_index << " offset " << line_offset << ": " << err_str[err_code] << endl;
 }
 
 
@@ -33,13 +41,13 @@ char * getToken() {
         if (input.eof()) {
             return NULL;
         }
-        line_inedx ++;
-        line_offset = 0;
+        line_index++;
+        line_offset = 1;
         getline(input, line_str);
         delete[] line;
         line = new char[line_str.length() + 1];
         strcpy(line, line_str.c_str());
-        cout << "line #" << line_inedx << ":" <<line << endl;
+        // cout << "  line " << line_index << ":" <<line << endl;
         token = strtok(line, " \t\n");
 
         // empty line
@@ -61,36 +69,143 @@ char * getToken() {
 
 
 int readInt() {
-
+    char * token = getToken();
+    bool isInt = true;
+    if (token) {
+        // check if token is int
+        for (int i = 0; i < strlen(token); i ++) {
+            if (!isdigit(token[i])) {
+                isInt = false;
+                break;
+            }
+        }
+        if (isInt) {
+            return atoi(token);
+        }
+        else {
+            return -1;
+        }
+    }
+    return -1;
 }
 
-int pass_1(char* filename){
+
+string readSymbol() {
+    string symbol = getToken();
+    if (!regex_match(symbol, regex("[a-zA-z][a-zA-Z0-9]*"))) {
+        _parseError(1, line_index, line_offset);
+        exit(0);
+    }
+    if (symbol.length() > 16) {
+        _parseError(3, line_index, line_offset);
+        exit(0);
+    }
+    return symbol;
+}
+
+
+string readIEAR() {
+    string instr = getToken();
+
+    return instr;
+}
+
+
+int pass_1(char * filename) {
     // opens file
     input.clear();
     string path = "lab1_assign/";
     input.open(path + filename);
     if (input.is_open() == false){
         cout << "Unable to open file: " << filename << endl;
-        return 1;
+        exit(0);
     }
 
     // get tokens
-    line_inedx = 0;
+    line_index = 0;
     line_offset = 0;
     module_index = 0;
+    module_base = 0;
+    num_instruction = 0;
     line = NULL;
     token = NULL;
+    symbolVec.clear();
 
     while (!input.eof()){
-        module_index ++;
+        module_index++;
+        cout << "Module: " << module_index << ", abs: " << num_instruction << endl;
 
         // Def list
         int def_count = readInt();
+        if (def_count == -1) {
+            if (input.eof()) {
+                break;
+            }
+            _parseError(0, line_index, line_offset);
+            exit(0);
+        }
+        if (def_count > 16) {
+            _parseError(4, line_index, line_offset);
+            exit(0);
+        }
+        for (int i = 0; i < def_count; i++) {
+            string symbol = readSymbol();
+            symbolVec.push_back(symbol);
 
-        token = getToken();
-        
-        cout << line_offset << ": " << token << endl;
+            int symbol_offset = readInt();
+            if (symbol_offset == -1) {
+                _parseError(0, line_index, line_offset);
+                exit(0);
+            }
+            symbolTable[symbol] = symbol_offset + module_base;
+        }
 
+
+        // Use list
+        int use_count = readInt();
+        if (use_count == -1) {
+            _parseError(0, line_index, line_offset);
+            exit(0);
+        }
+        if (use_count > 16) {
+            _parseError(5, line_index, line_offset);
+            exit(0);
+        }
+        for (int i = 0; i < use_count; i++) {
+            string symbol = readSymbol();
+        }
+
+
+        // Program text
+        int code_count = readInt();
+        if (code_count == -1) {
+            _parseError(0, line_index, line_offset);
+            exit(0);
+        }
+        num_instruction += code_count;
+        if (num_instruction > 512) {
+            _parseError(6, line_index, line_offset);
+            exit(0);
+        }
+        for (int i = 0; i < code_count; i++) {
+            string instr = readIEAR();
+
+            int op = readInt();
+            if (op == -1) {
+                _parseError(0, line_index, line_offset);
+                exit(0);
+            }
+        }
+
+        // update module_base
+        module_base += code_count;
+    }
+
+    // print symbolTable
+    cout << "Symbol Table" << endl;
+    for (int i = 0; i < symbolVec.size(); i++) {
+        string symbol = symbolVec[i];
+        cout << symbol << "=" << symbolTable[symbol] << endl;
     }
 
     input.close();

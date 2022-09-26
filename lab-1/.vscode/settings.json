@@ -4,6 +4,8 @@
     "ostream": "cpp",
     "istream": "cpp",
     "string": "cpp",
-    "new": "cpp"
+    "new": "cpp",
+    "iosfwd": "cpp",
+    "locale": "cpp"
   }
 }

@@ -1,7 +1,2 @@
-line #1:23 a 1 b 2
-0: 23
-4: a
-6: 1
-8: b
-10: 2
-line #2:
+Module: 1, abs: 0
+Parse Error line 1 offset 0: TOO_MANY_DEF_IN_MODULE
