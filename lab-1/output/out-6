@@ -1,3 +1,6 @@
 Symbol Table
 X21=3
 X31=4
+
+Memory Map
+Parse Error line 5 offset 1: SYM_EXPECTED

@@ -19,11 +19,12 @@ string line_str;
 char * line;
 char * token;
 vector<string> symbolVec;
+set<string> duplicateSymbol;
 unordered_map<string, int> symbolTable;
 
 
 void _parseError(int err_code, int line_index, int line_offset) {
-    static const char* err_str [] = {
+    static const char * err_str [] = {
         "NUM_EXPECTED",             // Number expect, anything >= 2^30 is not a number either
         "SYM_EXPECTED",             // Symbol Expected
         "ADDR_EXPECTED",            // Addressing Expected which is A/E/I/R
@@ -33,6 +34,28 @@ void _parseError(int err_code, int line_index, int line_offset) {
         "TOO_MANY_INSTR",           // Total num_instr exceeds memory size (512)
     };
     cout << "Parse Error line " << line_index << " offset " << line_offset << ": " << err_str[err_code] << endl;
+}
+
+
+void _errorMessage(int err_code, string symbol) {
+    if (err_code == 3) {
+        cout << " Error: " << symbol << " is not defined; zero used";
+    }
+    else if (err_code < 7) {
+        static const char * err_str [] = {
+            "Error: Absolute address exceeds machine size; zero used", 
+            "Error: Relative address exceeds module size; zero used", 
+            "Error: External address exceeds length of uselist; treated as immediate", 
+            "Error: Symbol is not defined; zero used",
+            "Error: This variable is multiple times defined; first value used", 
+            "Error: Illegal immediate value; treated as 9999", 
+            "Error: Illegal opcode; treated as 9999"
+        };
+        cout << " " << err_str[err_code];
+    }
+    else {
+        cout << "err_code not defined!";
+    }
 }
 
 
@@ -140,7 +163,7 @@ void pass_1(char * filename) {
         exit(0);
     }
 
-    // get tokens
+    // parse tokens
     line_index = 0;
     line_offset = 0;
     module_index = 0;
@@ -149,10 +172,10 @@ void pass_1(char * filename) {
     line = NULL;
     token = NULL;
     symbolVec.clear();
+    duplicateSymbol.clear();
 
     while (!input.eof()){
         module_index++;
-        // cout << "Module: " << module_index << ", abs: " << num_instruction << endl;
 
         // Def list
         int def_count = readInt();
@@ -169,16 +192,21 @@ void pass_1(char * filename) {
         }
         for (int i = 0; i < def_count; i++) {
             string symbol = readSymbol();
-            symbolVec.push_back(symbol);
-
             int symbol_offset = readInt();
             if (symbol_offset == -1) {
                 _parseError(0, line_index, line_offset);
                 exit(0);
             }
-            symbolTable[symbol] = symbol_offset + module_base;
+            // Check rule 2
+            bool symbol_exist = (symbolTable.find(symbol) != symbolTable.end());
+            if (!symbol_exist) {
+                symbolVec.push_back(symbol);
+                symbolTable[symbol] = symbol_offset + module_base;
+            }
+            else {
+                duplicateSymbol.insert(symbol);
+            }
         }
-        // cout << "def" << endl;
 
         // Use list
         int use_count = readInt();
@@ -193,7 +221,6 @@ void pass_1(char * filename) {
         for (int i = 0; i < use_count; i++) {
             string symbol = readSymbol();
         }
-
 
         // Program text
         int code_count = readInt();
@@ -215,7 +242,6 @@ void pass_1(char * filename) {
                 exit(0);
             }
         }
-
         // update module_base
         module_base += code_count;
     }
@@ -224,18 +250,63 @@ void pass_1(char * filename) {
     cout << "Symbol Table" << endl;
     for (int i = 0; i < symbolVec.size(); i++) {
         string symbol = symbolVec[i];
-        cout << symbol << "=" << symbolTable[symbol] << endl;
+        cout << symbol << "=" << symbolTable[symbol];
+        if (duplicateSymbol.find(symbol) != duplicateSymbol.end()) {
+            _errorMessage(4, "");
+        }
+        cout << endl;
+    }
+    cout << endl;
+    input.close();
+}
+
+
+void pass_2(char * filename) {
+    // opens file
+    input.clear();
+    string path = "lab1_assign/";
+    input.open(path + filename);
+    if (input.is_open() == false){
+        cout << "Unable to open file: " << filename << endl;
+        exit(0);
     }
 
-    input.close();
+    cout << "Memory Map" << endl;
+
+    // parse tokens
+    line_index = 0;
+    line_offset = 0;
+    module_index = 0;
+    module_base = 0;
+    num_instruction = 0;
+    line = NULL;
+    token = NULL;
+    symbolVec.clear();
+
+    while(!input.eof()) {
+        module_index++;
+        // cout << "Module: " << module_index << ", abs: " << num_instruction << endl;
+
+        // Def list
+        int def_count = readInt();
+        if (def_count == -1 && input.eof()) {
+            break;
+        }
+        for (int i = 0; i < def_count; i++) {
+            string symbol = readSymbol();
+            symbolVec.push_back(symbol);
+            int symbol_offset = readInt();
+            symbolTable[symbol] = symbol_offset + module_base;
+        }
+
+    }
+
 }
 
 
 
 int main(int argc, char ** argv){
-
     pass_1(argv[1]);
-
-
+    pass_2(argv[1]);
     return 0;
 }

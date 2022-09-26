@@ -1,3 +1,5 @@
 Symbol Table
-X21=5
-X21=5
+X21=3 Error: This variable is multiple times defined; first value used
+
+Memory Map
+Parse Error line 5 offset 1: SYM_EXPECTED
