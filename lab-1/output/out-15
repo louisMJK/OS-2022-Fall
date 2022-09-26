@@ -1,2 +1,2 @@
 Module: 1, abs: 0
-Parse Error line 1 offset 0: TOO_MANY_DEF_IN_MODULE
+Parse Error line 1 offset 1: TOO_MANY_DEF_IN_MODULE
