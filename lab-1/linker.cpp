@@ -19,8 +19,10 @@ string line_str;
 char * line;
 char * token;
 vector<string> symbolVec;
-set<string> duplicateSymbol;
 unordered_map<string, int> symbolTable;
+unordered_map<string, int> symbolErrCode;
+set<string> duplicateSymbol;
+set<string> usedSymbol;
 
 
 void _parseError(int err_code, int line_index, int line_offset) {
@@ -172,6 +174,8 @@ void pass_1(char * filename) {
     line = NULL;
     token = NULL;
     symbolVec.clear();
+    symbolTable.clear();
+    symbolErrCode.clear();
     duplicateSymbol.clear();
 
     while (!input.eof()){
@@ -282,6 +286,8 @@ void pass_2(char * filename) {
     line = NULL;
     token = NULL;
     symbolVec.clear();
+    symbolErrCode.clear();
+    usedSymbol.clear();
 
     while(!input.eof()) {
         module_index++;
@@ -294,11 +300,44 @@ void pass_2(char * filename) {
         }
         for (int i = 0; i < def_count; i++) {
             string symbol = readSymbol();
-            symbolVec.push_back(symbol);
             int symbol_offset = readInt();
+            // Check rule 2
+            bool symbol_exist = (symbolTable.find(symbol) != symbolTable.end());
+            if (symbol_exist) {
+                continue;
+            }
+            symbolVec.push_back(symbol);
             symbolTable[symbol] = symbol_offset + module_base;
         }
 
+
+        // Use list
+        vector<string> use_list;
+        int use_count = readInt();
+        for (int i = 0; i < use_count; i++) {
+            string symbol = readSymbol();
+            bool defined = (symbolTable.find(symbol) != symbolTable.end());
+            if (!defined) {
+                // rule 3
+                symbolErrCode[symbol] = 3;
+            }
+            use_list.push_back(symbol);
+            usedSymbol.insert(symbol);
+        }
+
+
+        // Program text
+        vector<int> memoryMap;
+        int code_count = readInt();
+        num_instruction += code_count;
+        for (int i = 0; i < code_count; i++) {
+            string instr = readIEAR();
+            int op = readInt();
+        }
+
+
+        // update module_base
+        module_base += code_count;
     }
 
 }

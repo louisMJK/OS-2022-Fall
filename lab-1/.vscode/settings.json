@@ -10,6 +10,7 @@
     "__tree": "cpp",
     "bitset": "cpp",
     "set": "cpp",
-    "vector": "cpp"
+    "vector": "cpp",
+    "unordered_map": "cpp"
   }
 }
