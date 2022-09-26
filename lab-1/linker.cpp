@@ -4,6 +4,7 @@
 #include <regex>
 #include <vector>
 #include <unordered_map>
+#include <set>
 
 using namespace std;
 
@@ -39,17 +40,23 @@ char * getToken() {
     if (token == NULL) {
         // get new line
         if (input.eof()) {
+            line_offset = line_str.length() + 1;
             return NULL;
         }
-        line_index++;
-        line_offset = 1;
+        string line_old = line_str;
         getline(input, line_str);
+        // last line in file
+        if (input.eof()) {
+            line_offset = line_old.length() + 1;
+            return NULL;
+        }
         delete[] line;
         line = new char[line_str.length() + 1];
+        line_index++;
+        line_offset = 1;
         strcpy(line, line_str.c_str());
         // cout << "  line " << line_index << ":" <<line << endl;
         token = strtok(line, " \t\n");
-
         // empty line
         if (token == NULL) {
             return getToken();
@@ -57,7 +64,6 @@ char * getToken() {
     }
     else {
         token = strtok(NULL, " \t\n");
-
         // end of line
         if (token == NULL) {
             return getToken();
@@ -91,7 +97,12 @@ int readInt() {
 
 
 string readSymbol() {
-    string symbol = getToken();
+    char * token = getToken();
+    if (token == NULL) {
+        _parseError(1, line_index, line_offset);
+        exit(0);
+    }
+    string symbol = token;
     if (!regex_match(symbol, regex("[a-zA-z][a-zA-Z0-9]*"))) {
         _parseError(1, line_index, line_offset);
         exit(0);
@@ -105,13 +116,21 @@ string readSymbol() {
 
 
 string readIEAR() {
-    string instr = getToken();
-
+    char * token = getToken();
+    if (token == NULL) {
+        _parseError(2, line_index, line_offset);
+        exit(0);
+    }
+    string instr = token;
+    if (instr != "I" && instr != "E" && instr != "A" && instr != "R") {
+        _parseError(2, line_index, line_offset);
+        exit(0);
+    }
     return instr;
 }
 
 
-int pass_1(char * filename) {
+void pass_1(char * filename) {
     // opens file
     input.clear();
     string path = "lab1_assign/";
@@ -133,7 +152,7 @@ int pass_1(char * filename) {
 
     while (!input.eof()){
         module_index++;
-        cout << "Module: " << module_index << ", abs: " << num_instruction << endl;
+        // cout << "Module: " << module_index << ", abs: " << num_instruction << endl;
 
         // Def list
         int def_count = readInt();
@@ -159,7 +178,7 @@ int pass_1(char * filename) {
             }
             symbolTable[symbol] = symbol_offset + module_base;
         }
-
+        // cout << "def" << endl;
 
         // Use list
         int use_count = readInt();
@@ -209,15 +228,13 @@ int pass_1(char * filename) {
     }
 
     input.close();
-    
-    return 0;
 }
 
 
 
 int main(int argc, char ** argv){
 
-    int pass1 = pass_1(argv[1]);
+    pass_1(argv[1]);
 
 
     return 0;
