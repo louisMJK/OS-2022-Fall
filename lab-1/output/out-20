@@ -6,6 +6,7 @@ Memory Map
 001: 0002
 002: 0008
 003: 0000
+Warning: Module 1: whiskey appeared in the uselist but was not actually used
 
 Warning: Module 1: bourbon was defined but never used
 

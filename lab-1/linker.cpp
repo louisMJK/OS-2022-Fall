@@ -311,7 +311,7 @@ void pass_2(char * filename) {
     line = NULL;
     token = NULL;
     vector<string> symbolVec;
-    set<string> usedSymbol;
+    set<string> useListSymbol;
     set<string> undefinedSymbol;
     unordered_map<string, int> symbolModule;
 
@@ -331,7 +331,6 @@ void pass_2(char * filename) {
             symbolModule[symbol] = module_index;
         }
 
-
         // Use list
         vector<string> use_list;
         int use_count = readInt();
@@ -343,14 +342,13 @@ void pass_2(char * filename) {
                 undefinedSymbol.insert(symbol);
             }
             use_list.push_back(symbol);
-            usedSymbol.insert(symbol);
+            useListSymbol.insert(symbol);
         }
-
 
         // Program text
         int address;
+        set<string> usedSymbol;
         int code_count = readInt();
-        num_instruction += code_count;
 
         for (int i = 0; i < code_count; i++) {
             string instr = readIEAR();
@@ -360,7 +358,7 @@ void pass_2(char * filename) {
             string err_str = "";
             address = module_base + i;
 
-            // instruction
+            // instructions
             if (instr == "I") {
                 if (op >= 10000) {
                     // rule 10
@@ -368,7 +366,6 @@ void pass_2(char * filename) {
                     op = 9999;
                 }
             }
-
             else if (instr == "R") {
                 if (op >= 10000) {
                     // rule 11
@@ -384,7 +381,6 @@ void pass_2(char * filename) {
                     op += module_base;
                 }
             }
-
             else if (instr == "A") {
                 if (op >= 10000) {
                     // rule 11
@@ -397,7 +393,6 @@ void pass_2(char * filename) {
                     op = (op / 1000) * 1000;
                 }
             }
-
             else if (instr == "E") {
                 if (op >= 10000) {
                     // rule 11
@@ -412,6 +407,7 @@ void pass_2(char * filename) {
                     int operand = op % 1000;
                     string symbol = use_list[operand];
                     op = (op / 1000) * 1000 + symbolTable[symbol];
+                    usedSymbol.insert(symbol);
                     // rule 3
                     if (undefinedSymbol.find(symbol) != undefinedSymbol.end()) {
                         err_code = 3;
@@ -429,6 +425,14 @@ void pass_2(char * filename) {
             cout << endl;
         }
 
+        // rule 7
+        for (int i = 0; i < use_list.size(); i++) {
+            string symbol = use_list[i];
+            if (usedSymbol.find(symbol) == usedSymbol.end()) {
+                _warningMessage(1, module_index, symbol, -1, -1);
+            }
+        }
+
         // update module_base
         module_base += code_count;
     }
@@ -439,7 +443,7 @@ void pass_2(char * filename) {
     // rule 4
     for (int i = 0; i < symbolVec.size(); i++) {
         string symbol = symbolVec[i];
-        if (usedSymbol.find(symbol) == usedSymbol.end()) {
+        if (useListSymbol.find(symbol) == useListSymbol.end()) {
             _warningMessage(2, symbolModule[symbol], symbol, 0, 0);
         }
     }
