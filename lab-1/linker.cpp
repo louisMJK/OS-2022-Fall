@@ -61,6 +61,19 @@ void _errorMessage(int err_code, string symbol) {
 }
 
 
+void _warningMessage(int err_code, int module_index, string symbol, int offset, int module_size) {
+    if (err_code == 0) {
+        printf("Warning: Module %d: %s too big %d (max=%d) assume zero relative\n", module_index, symbol.c_str(), offset, module_size);
+    }
+    else if (err_code == 1) {
+        printf("Warning: Module %d: %s appeared in the uselist but was not actually used\n", module_index, symbol.c_str());
+    }
+    else {
+        cout << "Warning: err_code not defined!";
+    }
+}
+
+
 char * getToken() {
     if (token == NULL) {
         // get new line
@@ -181,6 +194,7 @@ void pass_1(char * filename) {
         module_index++;
 
         // Def list
+        vector<string> def_list;
         int def_count = readInt();
         if (def_count == -1) {
             if (input.eof()) {
@@ -200,10 +214,11 @@ void pass_1(char * filename) {
                 _parseError(0, line_index, line_offset);
                 exit(0);
             }
-            // Check rule 2
+            // rule 2
             bool symbol_exist = (symbolTable.find(symbol) != symbolTable.end());
             if (!symbol_exist) {
                 symbolVec.push_back(symbol);
+                def_list.push_back(symbol);
                 symbolTable[symbol] = symbol_offset + module_base;
             }
             else {
@@ -238,13 +253,23 @@ void pass_1(char * filename) {
         }
         for (int i = 0; i < code_count; i++) {
             string instr = readIEAR();
-
             int op = readInt();
             if (op == -1) {
                 _parseError(0, line_index, line_offset);
                 exit(0);
             }
         }
+        
+        // rule 5
+        for (int i = 0; i < def_list.size(); i++) {
+            string symbol = def_list[i];
+            int offset = symbolTable[symbol] - module_base;
+            if (offset >= code_count) {
+                _warningMessage(0, module_index, symbol, offset, code_count - 1);
+                symbolTable[symbol] = module_base;
+            }
+        }
+
         // update module_base
         module_base += code_count;
     }
@@ -419,9 +444,9 @@ void pass_2(char * filename) {
 }
 
 
-
 int main(int argc, char ** argv){
     pass_1(argv[1]);
     pass_2(argv[1]);
     return 0;
 }
+

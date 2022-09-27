@@ -39,21 +39,9 @@
 
 ################### input-10##################
 ###    Warning Diff:    .....
-1,3d0
-< Warning: Module 1: ab too big 6 (max=2) assume zero relative
+2d1
 < Warning: Module 1: ab was defined but never used
-< Warning: Module 2: xy too big 8 (max=4) assume zero relative
 ###    Code/Error Diff: .....
-2,3c2,3
-< ab=0
-< xy=3
----
-> ab=6
-> xy=11
-12c12
-< 007: 7003
----
-> 007: 7011
 
 ################### input-20##################
 ###    Warning Diff:    .....
