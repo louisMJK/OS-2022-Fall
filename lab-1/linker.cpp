@@ -1,10 +1,11 @@
 #include <iostream>
 #include <fstream>
-#include <string.h>
+#include <string>
 #include <regex>
 #include <vector>
 #include <unordered_map>
 #include <set>
+#include <string.h>
 
 using namespace std;
 
@@ -20,7 +21,6 @@ char * line;
 char * token;
 vector<string> symbolVec;
 unordered_map<string, int> symbolTable;
-unordered_map<string, int> symbolErrCode;
 set<string> duplicateSymbol;
 set<string> usedSymbol;
 
@@ -175,7 +175,6 @@ void pass_1(char * filename) {
     token = NULL;
     symbolVec.clear();
     symbolTable.clear();
-    symbolErrCode.clear();
     duplicateSymbol.clear();
 
     while (!input.eof()){
@@ -233,7 +232,7 @@ void pass_1(char * filename) {
             exit(0);
         }
         num_instruction += code_count;
-        if (num_instruction > 512) {
+        if (num_instruction >= 512) {
             _parseError(6, line_index, line_offset);
             exit(0);
         }
@@ -286,12 +285,10 @@ void pass_2(char * filename) {
     line = NULL;
     token = NULL;
     symbolVec.clear();
-    symbolErrCode.clear();
     usedSymbol.clear();
 
     while(!input.eof()) {
         module_index++;
-        // cout << "Module: " << module_index << ", abs: " << num_instruction << endl;
 
         // Def list
         int def_count = readInt();
@@ -313,13 +310,14 @@ void pass_2(char * filename) {
 
         // Use list
         vector<string> use_list;
+        set<string> undefinedSymbol;
         int use_count = readInt();
         for (int i = 0; i < use_count; i++) {
             string symbol = readSymbol();
             bool defined = (symbolTable.find(symbol) != symbolTable.end());
             if (!defined) {
                 // rule 3
-                symbolErrCode[symbol] = 3;
+                undefinedSymbol.insert(symbol);
             }
             use_list.push_back(symbol);
             usedSymbol.insert(symbol);
@@ -327,19 +325,97 @@ void pass_2(char * filename) {
 
 
         // Program text
-        vector<int> memoryMap;
+        int address;
         int code_count = readInt();
         num_instruction += code_count;
+
         for (int i = 0; i < code_count; i++) {
             string instr = readIEAR();
             int op = readInt();
+
+            int err_code = -1;
+            string err_str = "";
+            address = module_base + i;
+
+            // instruction
+            if (instr == "I") {
+                if (op >= 10000) {
+                    // rule 10
+                    err_code = 5;
+                    op = 9999;
+                }
+            }
+
+            else if (instr == "R") {
+                if (op >= 10000) {
+                    // rule 11
+                    err_code = 6;
+                    op = 9999;
+                }
+                else if (op % 1000 >= code_count) {
+                    // rule 9
+                    err_code = 1;
+                    op = (op / 1000) * 1000 + module_base;
+                }
+                else {
+                    op += module_base;
+                }
+            }
+
+            else if (instr == "A") {
+                if (op >= 10000) {
+                    // rule 11
+                    err_code = 6;
+                    op = 9999;
+                }
+                else if (op % 1000 >= 512) {
+                    // rule 8
+                    err_code = 0;
+                    op = (op / 1000) * 1000;
+                }
+            }
+
+            else if (instr == "E") {
+                if (op >= 10000) {
+                    // rule 11
+                    err_code = 6;
+                    op = 9999;
+                }
+                else if (op % 1000 >= use_count) {
+                    // rule 6
+                    err_code = 2;
+                }
+                else {
+                    int operand = op % 1000;
+                    string symbol = use_list[operand];
+                    op = (op / 1000) * 1000 + symbolTable[symbol];
+                    // rule 3
+                    if (undefinedSymbol.find(symbol) != undefinedSymbol.end()) {
+                        err_code = 3;
+                        err_str = symbol;
+                    }
+                }
+
+            }
+
+            // print Memory Map
+            printf("%03d: %04d", address, op);
+            if (err_code != -1) {
+                _errorMessage(err_code, err_str);
+            }
+            cout << endl;
         }
 
 
         // update module_base
         module_base += code_count;
     }
+    cout << endl;
 
+    // 
+
+
+    cout << endl;
 }
 
 

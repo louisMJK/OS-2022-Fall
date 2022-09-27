@@ -1,47 +1,3 @@
-################### input-1##################
-###    Warning Diff:    .....
-###    Code/Error Diff: .....
-4,20d3
-< Memory Map
-< 000: 1004
-< 001: 5678
-< 002: 2015
-< 003: 8002
-< 004: 7002
-< 005: 8006
-< 006: 1015
-< 007: 1015
-< 008: 3015
-< 009: 1007
-< 010: 1010
-< 011: 5012
-< 012: 4015
-< 013: 8000
-< 014: 1015
-< 015: 2002
-
-################### input-2##################
-###    Warning Diff:    .....
-###    Code/Error Diff: .....
-4,20d3
-< Memory Map
-< 000: 1004
-< 001: 5678
-< 002: 2015
-< 003: 8002
-< 004: 7002
-< 005: 8006
-< 006: 1015
-< 007: 1015
-< 008: 3015
-< 009: 1007
-< 010: 1010
-< 011: 5012
-< 012: 4015
-< 013: 8000
-< 014: 1015
-< 015: 2002
-
 ################### input-3##################
 ###    Warning Diff:    .....
 1,4d0
@@ -50,120 +6,36 @@
 < Warning: Module 2: X23 was defined but never used
 < Warning: Module 6: X61 was defined but never used
 ###    Code/Error Diff: .....
-10,46d9
-< Memory Map
-< 000: 1000
-< 001: 1020
-< 002: 1012
-< 003: 1020
-< 004: 1012
-< 005: 1012
-< 006: 1006
-< 007: 1007
-< 008: 1008
-< 009: 1009
-< 010: 2009
-< 011: 2006
-< 012: 2012
-< 013: 2006
-< 014: 2009
-< 015: 2015
-< 016: 2009
-< 017: 2020
-< 018: 3000
-< 019: 3701
-< 020: 3002
-< 021: 4021
-< 022: 4020
-< 023: 4006
-< 024: 4024
-< 025: 4025
-< 026: 4012
-< 027: 5027
-< 028: 5987
-< 029: 5029
-< 030: 6030
-< 031: 6020
-< 032: 6002
-< 033: 6003
-< 034: 6034
-< 035: 6005
-
-################### input-4##################
-###    Warning Diff:    .....
-###    Code/Error Diff: .....
-2,8c2,3
-< X21=3 Error: This variable is multiple times defined; first value used
-< Memory Map
-< 000: 2003
-< 001: 2003
-< 002: 2003
-< 003: 2000 Error: Absolute address exceeds machine size; zero used
-< 004: 3465
----
-> X21=5
-> X21=5
 
 ################### input-5##################
 ###    Warning Diff:    .....
 1d0
 < Warning: Module 3: X31 was defined but never used
 ###    Code/Error Diff: .....
-3,8d2
-< Memory Map
-< 000: 1000 Error: X21 is not defined; zero used
-< 001: 1000 Error: X21 is not defined; zero used
-< 002: 1000 Error: X21 is not defined; zero used
-< 003: 2000 Error: Absolute address exceeds machine size; zero used
-< 004: 3456
 
 ################### input-6##################
 ###    Warning Diff:    .....
 1d0
 < Warning: Module 3: X31 was defined but never used
 ###    Code/Error Diff: .....
-4,9d3
-< Memory Map
-< 000: 1003
-< 001: 1003
-< 002: 1003
-< 003: 2000 Error: Absolute address exceeds machine size; zero used
-< 004: 3004 Error: Relative address exceeds module size; zero used
 
 ################### input-7##################
 ###    Warning Diff:    .....
 1d0
 < Warning: Module 3: X31 was defined but never used
 ###    Code/Error Diff: .....
-4,9d3
-< Memory Map
-< 000: 1003
-< 001: 1004 Error: External address exceeds length of uselist; treated as immediate
-< 002: 1222 Error: External address exceeds length of uselist; treated as immediate
-< 003: 2000 Error: Absolute address exceeds machine size; zero used
-< 004: 3004 Error: Relative address exceeds module size; zero used
 
 ################### input-8##################
 ###    Warning Diff:    .....
 1d0
 < Warning: Module 1: X21 appeared in the uselist but was not actually used
 ###    Code/Error Diff: .....
-2,5d1
-< Memory Map
-< 000: 1001 Error: External address exceeds length of uselist; treated as immediate
-< 001: 1004 Error: External address exceeds length of uselist; treated as immediate
-< 002: 1222 Error: External address exceeds length of uselist; treated as immediate
 
 ################### input-9##################
 ###    Warning Diff:    .....
 1d0
 < Warning: Module 1: X31 appeared in the uselist but was not actually used
 ###    Code/Error Diff: .....
-3,6d2
-< Memory Map
-< 000: 2001
-< 001: 3001
-< 002: 4001
 
 ################### input-10##################
 ###    Warning Diff:    .....
@@ -172,32 +44,16 @@
 < Warning: Module 1: ab was defined but never used
 < Warning: Module 2: xy too big 8 (max=4) assume zero relative
 ###    Code/Error Diff: .....
-2,12c2,3
+2,3c2,3
 < ab=0
 < xy=3
-< Memory Map
-< 000: 1000
-< 001: 2000
-< 002: 3000
-< 003: 1007
-< 004: 5678
-< 005: 2000 Error: z is not defined; zero used
-< 006: 8005
-< 007: 7003
 ---
 > ab=6
 > xy=11
-
-################### input-19##################
-###    Warning Diff:    .....
-###    Code/Error Diff: .....
-2,7d1
-< Memory Map
-< 000: 9999 Error: Illegal opcode; treated as 9999
-< 001: 9999 Error: Illegal immediate value; treated as 9999
-< 002: 9999 Error: Illegal immediate value; treated as 9999
-< 003: 0000
-< 004: 3001
+12c12
+< 007: 7003
+---
+> 007: 7011
 
 ################### input-20##################
 ###    Warning Diff:    .....
@@ -205,10 +61,4 @@
 < Warning: Module 1: bourbon was defined but never used
 < Warning: Module 1: whiskey appeared in the uselist but was not actually used
 ###    Code/Error Diff: .....
-3,7d2
-< Memory Map
-< 000: 0002
-< 001: 0002
-< 002: 0008
-< 003: 0000
 
