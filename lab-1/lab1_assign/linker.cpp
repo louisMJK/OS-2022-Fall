@@ -5,7 +5,6 @@
 #include <vector>
 #include <unordered_map>
 #include <set>
-// #include <string.h>
 
 using namespace std;
 
@@ -93,7 +92,6 @@ char * getToken() {
         line_index++;
         line_offset = 1;
         strcpy(line, line_str.c_str());
-        // cout << "  line " << line_index << ":" <<line << endl;
         token = strtok(line, " \t\n");
         // empty line
         if (token == NULL) {
@@ -168,13 +166,13 @@ string readIEAR() {
 }
 
 
-void pass_1(char * filename) {
+void pass_1(char * path) {
     // opens file
     input.clear();
-    string path = "lab1_assign/";
-    input.open(path + filename);
+    string path_str = path;
+    input.open(path_str);
     if (input.is_open() == false){
-        cout << "Unable to open file: " << filename << endl;
+        cout << "Unable to open: " << path << endl;
         exit(0);
     }
 
@@ -289,13 +287,13 @@ void pass_1(char * filename) {
 }
 
 
-void pass_2(char * filename) {
+void pass_2(char * path) {
     // opens file
     input.clear();
-    string path = "lab1_assign/";
-    input.open(path + filename);
+    string path_str = path;
+    input.open(path_str);
     if (input.is_open() == false){
-        cout << "Unable to open file: " << filename << endl;
+        cout << "Unable to open file: " << path << endl;
         exit(0);
     }
 
