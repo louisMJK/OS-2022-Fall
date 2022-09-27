@@ -22,7 +22,6 @@ char * token;
 unordered_map<string, int> symbolTable;
 
 
-
 void _parseError(int err_code, int line_index, int line_offset) {
     static const char * err_str [] = {
         "NUM_EXPECTED",             // Number expect, anything >= 2^30 is not a number either
@@ -311,7 +310,7 @@ void pass_2(char * filename) {
     line = NULL;
     token = NULL;
     vector<string> symbolVec;
-    set<string> useListSymbol;
+    set<string> used;
     set<string> undefinedSymbol;
     unordered_map<string, int> symbolModule;
 
@@ -341,7 +340,6 @@ void pass_2(char * filename) {
                 undefinedSymbol.insert(symbol);
             }
             use_list.push_back(symbol);
-            useListSymbol.insert(symbol);
         }
 
         // Program text
@@ -406,6 +404,7 @@ void pass_2(char * filename) {
                     string symbol = use_list[operand];
                     op = (op / 1000) * 1000 + symbolTable[symbol];
                     usedSymbol.insert(symbol);
+                    used.insert(symbol);
                     // rule 3
                     if (undefinedSymbol.find(symbol) != undefinedSymbol.end()) {
                         err_code = 3;
@@ -441,7 +440,7 @@ void pass_2(char * filename) {
     // rule 4
     for (int i = 0; i < symbolVec.size(); i++) {
         string symbol = symbolVec[i];
-        if (useListSymbol.find(symbol) == useListSymbol.end()) {
+        if (used.find(symbol) == used.end()) {
             _warningMessage(2, symbolModule[symbol], symbol, 0, 0);
         }
     }
