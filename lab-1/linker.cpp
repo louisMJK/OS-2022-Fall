@@ -327,7 +327,6 @@ void pass_2(char * filename) {
             string symbol = readSymbol();
             int symbol_offset = readInt();
             symbolVec.push_back(symbol);
-            symbolTable[symbol] = symbol_offset + module_base;
             symbolModule[symbol] = module_index;
         }
 
@@ -349,7 +348,6 @@ void pass_2(char * filename) {
         int address;
         set<string> usedSymbol;
         int code_count = readInt();
-
         for (int i = 0; i < code_count; i++) {
             string instr = readIEAR();
             int op = readInt();

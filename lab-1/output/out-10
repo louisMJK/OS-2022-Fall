@@ -12,7 +12,7 @@ Memory Map
 004: 5678
 005: 2000 Error: z is not defined; zero used
 006: 8005
-007: 7011
+007: 7003
 
 Warning: Module 1: ab was defined but never used
 
