@@ -8,4 +8,5 @@ Memory Map
 003: 2000 Error: Absolute address exceeds machine size; zero used
 004: 3456
 
+Warning: Module 3: X31 was defined but never used
 

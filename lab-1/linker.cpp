@@ -5,7 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <set>
-#include <string.h>
+// #include <string.h>
 
 using namespace std;
 
@@ -19,10 +19,8 @@ int num_instruction;
 string line_str;
 char * line;
 char * token;
-vector<string> symbolVec;
 unordered_map<string, int> symbolTable;
-set<string> duplicateSymbol;
-set<string> usedSymbol;
+
 
 
 void _parseError(int err_code, int line_index, int line_offset) {
@@ -67,6 +65,9 @@ void _warningMessage(int err_code, int module_index, string symbol, int offset, 
     }
     else if (err_code == 1) {
         printf("Warning: Module %d: %s appeared in the uselist but was not actually used\n", module_index, symbol.c_str());
+    }
+    else if (err_code == 2) {
+        printf("Warning: Module %d: %s was defined but never used\n", module_index, symbol.c_str());
     }
     else {
         cout << "Warning: err_code not defined!";
@@ -186,9 +187,9 @@ void pass_1(char * filename) {
     num_instruction = 0;
     line = NULL;
     token = NULL;
-    symbolVec.clear();
+    vector<string> symbolVec;
+    set<string> duplicateSymbol;
     symbolTable.clear();
-    duplicateSymbol.clear();
 
     while (!input.eof()){
         module_index++;
@@ -309,8 +310,10 @@ void pass_2(char * filename) {
     num_instruction = 0;
     line = NULL;
     token = NULL;
-    symbolVec.clear();
-    usedSymbol.clear();
+    vector<string> symbolVec;
+    set<string> usedSymbol;
+    set<string> undefinedSymbol;
+    unordered_map<string, int> symbolModule;
 
     while(!input.eof()) {
         module_index++;
@@ -323,19 +326,14 @@ void pass_2(char * filename) {
         for (int i = 0; i < def_count; i++) {
             string symbol = readSymbol();
             int symbol_offset = readInt();
-            // Check rule 2
-            bool symbol_exist = (symbolTable.find(symbol) != symbolTable.end());
-            if (symbol_exist) {
-                continue;
-            }
             symbolVec.push_back(symbol);
             symbolTable[symbol] = symbol_offset + module_base;
+            symbolModule[symbol] = module_index;
         }
 
 
         // Use list
         vector<string> use_list;
-        set<string> undefinedSymbol;
         int use_count = readInt();
         for (int i = 0; i < use_count; i++) {
             string symbol = readSymbol();
@@ -431,14 +429,20 @@ void pass_2(char * filename) {
             cout << endl;
         }
 
-
         // update module_base
         module_base += code_count;
     }
+
+    input.close();
     cout << endl;
 
-    // 
-
+    // rule 4
+    for (int i = 0; i < symbolVec.size(); i++) {
+        string symbol = symbolVec[i];
+        if (usedSymbol.find(symbol) == usedSymbol.end()) {
+            _warningMessage(2, symbolModule[symbol], symbol, 0, 0);
+        }
+    }
 
     cout << endl;
 }

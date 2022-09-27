@@ -46,4 +46,8 @@ Memory Map
 034: 6034
 035: 6005
 
+Warning: Module 1: X12 was defined but never used
+Warning: Module 2: X21 was defined but never used
+Warning: Module 2: X23 was defined but never used
+Warning: Module 6: X61 was defined but never used
 
