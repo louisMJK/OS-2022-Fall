@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <list>
+#include <string>
 
 
 using namespace std;
@@ -29,6 +30,7 @@ enum process_transition_t {
 class Process
 {
 public:
+    int pid;
     int arrival_time;
     int total_cpu_time;
     int max_cpu_burst;
@@ -42,7 +44,8 @@ public:
     int cpu_burst;
     int io_burst;
     
-    Process(int at, int tc, int cb, int io, int prio) {
+    Process(int id, int at, int tc, int cb, int io, int prio) {
+        pid = id;
         arrival_time = at;
         total_cpu_time = tc;
         max_cpu_burst = cb;
@@ -161,6 +164,41 @@ public:
 };
 
 
+class Random
+{
+private:
+    int * randvals;
+    int size;
+    int ofs;
+public:
+    int randomInt(int burst) {
+        ofs = ofs % size;
+        ofs++;
+        return 1 + (randvals[ofs] % burst);
+    };
+
+    Random(char * path) {
+        ofs = 0;
+        ifstream input;
+        input.open(path);
+        if (!input.is_open()) {
+            cout << "Unable to open: " << path << endl;
+            exit(0);
+        }
+        string line;
+        getline(input, line);
+        size = stoi(line);
+        randvals = new int[size];
+        for (int i = 0; i < size; i++) {
+            getline(input, line);
+            randvals[i] = stoi(line);
+        }
+        input.close();
+    };
+
+    ~Random() {};
+};
+
 
 void simulation (Scheduler * scheduler, EventQueue * que, int quantum) {
     Event * event;
@@ -214,6 +252,8 @@ void simulation (Scheduler * scheduler, EventQueue * que, int quantum) {
 
 int main (int argc, char ** argv) {
     int verbose = 0;
+    int quantum = 10;
+    int maxPrio = 4;    // default max priority
     int c;
     string scheduler_type;
 
@@ -251,12 +291,43 @@ int main (int argc, char ** argv) {
     // create event queue
     EventQueue * que = new EventQueue();
 
-    // read input
-    int quantum = 0;
+    // read input file
+    char * path_input = argv[optind];
+    char * path_rand = argv[optind + 1];
+    Random rand(path_rand);
+    ifstream input;
+    input.open(path_input);
+    if (!input.is_open()) {
+        cout << "Unable to open: " << path_input << endl;
+        exit(0);
+    }
 
+    int pid = 0;
+    int AT;
+    int TC;
+    int CB;
+    int IO;
+    int priority;
 
+    while (!input.eof()) {
+        input >> AT;
+        if (input.eof()) {
+            break;
+        }
+        input >> TC;
+        input >> CB;
+        input >> IO;
+        priority = rand.randomInt(maxPrio);
+        Process * process = new Process(pid, AT, TC, CB, IO, priority);
+        Event * event = new Event(AT, process, STATE_CREATED, STATE_READY, TRANS_TO_READY);
+        que->add_event(event);
+        pid++;
 
-    simulation(scheduler, que, quantum);
+        printf("%d --- %d, %d, %d, %d \n", pid, AT, TC, CB, IO);
+    }
+    input.close();
+
+    // simulation(scheduler, que, quantum);
 
     return 0;
 }
