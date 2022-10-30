@@ -161,9 +161,9 @@ class FCFS: public Scheduler
 private:
     list<Process * > que;
 public:
-    void add_process(Process * proc) {
-        proc->state = STATE_READY;
-        que.push_back(proc);
+    void add_process(Process * p) {
+        p->state = STATE_READY;
+        que.push_back(p);
     }
 
     Process * get_next_process() {
@@ -171,9 +171,9 @@ public:
             return nullptr;
         }
         else {
-            Process * proc = que.front();
+            Process * p = que.front();
             que.pop_front();
-            return proc;
+            return p;
         }
     }
 
@@ -210,7 +210,7 @@ public:
     }
 };
 
-class SRTF : public Scheduler 
+class SRTF: public Scheduler 
 {
 private:
 	list<Process *> que;
@@ -244,6 +244,33 @@ public:
 		scheduler_type = "SRTF";
 		preempt = false;
 	};
+};
+
+class RR: public Scheduler
+{
+private:
+    list<Process * > que;
+public:
+    void add_process(Process * p) {
+        p->state = STATE_READY;
+        que.push_back(p);
+    }
+
+    Process * get_next_process() {
+        if (que.empty()) {
+            return nullptr;
+        }
+        else {
+            Process * p = que.front();
+            que.pop_front();
+            return p;
+        }
+    }
+
+    RR(int quantum) {
+        scheduler_type = "RR " + to_string(quantum);
+        preempt = false;
+    }
 };
 
 
@@ -387,13 +414,13 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, int quantum, Rand
                         break;
                     }
                 }
-                if (timestamp > 0 && timestamp != time_current && (proc->priority - 1) > process_running->priority_d) {
-                    process_running->time_cpu_remain = (*iter)->process->time_cpu_remain_prev - (time_current - process_running->timestamp_prev);
-                    process_running->cpu_burst = (*iter)->process->cpu_burst_prev - (time_current - process_running->timestamp_prev);
-                    eventQue->que.erase(iter);
-                    Event * newEvent = new Event(time_current, process_running, STATE_RUNNING, STATE_READY, TRANS_TO_PREEMPT);
-                    eventQue->add_event(newEvent);
-                }
+                // if (timestamp > 0 && timestamp != time_current && (proc->priority - 1) > process_running->priority_d) {
+                //     process_running->time_cpu_remain = (*iter)->process->time_cpu_remain_prev - (time_current - process_running->timestamp_prev);
+                //     process_running->cpu_burst = (*iter)->process->cpu_burst_prev - (time_current - process_running->timestamp_prev);
+                //     eventQue->que.erase(iter);
+                //     Event * newEvent = new Event(time_current, process_running, STATE_RUNNING, STATE_READY, TRANS_TO_PREEMPT);
+                //     eventQue->add_event(newEvent);
+                // }
 
             }
             scheduler->add_process(proc);
@@ -564,6 +591,9 @@ int main (int argc, char ** argv) {
 	case 'S':
 		scheduler = new SRTF();
 		break;
+    case 'R':
+        quantum = stoi(scheduler_type.substr(1, string::npos));
+        scheduler = new RR(quantum);
     default:
         break;
     }
