@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 #include <vector>
+# include <queue>
 
 
 using namespace std;
@@ -46,6 +47,7 @@ public:
     int io_burst;
     int time_cpu_remain_prev;
     int cpu_burst_prev;
+    int time_to_que;
     
     Process(int id, int at, int tc, int cb, int io, int prio) {
         pid = id;
@@ -181,6 +183,69 @@ public:
     }
 };
 
+class LCFS: public Scheduler
+{
+private:
+    list<Process *> que;
+public:
+    void add_process(Process * p) {
+        p->state = STATE_READY;
+        que.push_back(p);
+    }
+
+    Process * get_next_process() {
+        if (que.empty()) {
+            return nullptr;
+        }
+        else {
+            Process * p = que.back();
+            que.pop_back();
+            return p;
+        }
+    }
+
+    LCFS() {
+        scheduler_type = "LCFS";
+        preempt = false;
+    }
+};
+
+class SRTF : public Scheduler 
+{
+private:
+	list<Process *> que;
+public:
+	void add_process(Process * p) {
+		p->state = STATE_READY;
+		list<Process *>::iterator iter;
+		for(iter = que.begin(); iter != que.end(); iter++) {
+			if((*iter)->time_cpu_remain > p->time_cpu_remain) {
+				que.insert(iter, p);
+				break;
+			}
+		}
+		if(iter == que.end()) {
+			que.push_back(p);
+		}
+	};
+
+	Process * get_next_process()  {
+		if(que.empty()) {
+			return nullptr;
+		}
+		else {
+			Process * p = que.front();
+			que.pop_front();
+			return p;
+		}
+	};
+
+	SRTF() {
+		scheduler_type = "SRTF";
+		preempt = false;
+	};
+};
+
 
 class Random
 {
@@ -314,7 +379,7 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, int quantum, Rand
             // add to run queue, no event created
             if (scheduler->preempt && process_running) {
                 int timestamp = 0;
-                // pq fix
+
                 list<Event *>::iterator iter;
                 for(iter = eventQue->que.begin(); iter != eventQue->que.end(); iter++) {
                     if ((*iter)->process->pid == process_running->pid) {
@@ -332,6 +397,7 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, int quantum, Rand
 
             }
             scheduler->add_process(proc);
+            proc->time_to_que = time_current;
             call_scheduler = true;
             break;
         }
@@ -419,6 +485,7 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, int quantum, Rand
             // add to runqueue (no event is generated)
             stats.CPU_UTIL += proc->time_in_prev_state;
             scheduler->add_process(proc);
+            proc->time_to_que = time_current;
             call_scheduler = true;
             process_running = nullptr;
             break;
@@ -491,12 +558,12 @@ int main (int argc, char ** argv) {
     case 'F':
         scheduler = new FCFS();
         break;
-    // case 'L':
-	// 	scheduler = new LCFS();
-	// 	break;
-	// case 'S':
-	// 	scheduler = new SRTF();
-	// 	break;
+    case 'L':
+		scheduler = new LCFS();
+		break;
+	case 'S':
+		scheduler = new SRTF();
+		break;
     default:
         break;
     }
