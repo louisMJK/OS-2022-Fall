@@ -75,14 +75,14 @@ public:
     int timestamp;
     Process * process;
     process_state_t state_prev;
-    process_state_t state_next;
+    // process_state_t state_next;
     process_transition_t transition;
 
-    Event(int ts, Process * proc, process_state_t state_from, process_state_t state_to, process_transition_t trans) {
+    Event(int ts, Process * proc, process_state_t state_from, process_transition_t trans) {
         timestamp = ts;
         process = proc;
         state_prev = state_from;
-        state_next = state_to;
+        // state_next = state_to;
         transition = trans;
     }
 
@@ -155,6 +155,7 @@ class FCFS: public Scheduler
 {
 private:
     list<Process * > que;
+
 public:
     void add_process(Process * p) {
         p->state = STATE_READY;
@@ -530,6 +531,7 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
         {
         case TRANS_TO_READY: {
             // must come from BLOCKED or CREATED
+
             if (scheduler->preempt && process_running) {
                 int timestamp = 0;
 
@@ -544,10 +546,19 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
                     process_running->time_cpu_remain = (*iter)->process->time_cpu_remain_prev - (TIME_CURRENT - process_running->state_TS);
                     process_running->cpu_burst = (*iter)->process->cpu_burst_prev - (TIME_CURRENT - process_running->state_TS);
                     eventQue->que.erase(iter);
-                    Event * newEvent = new Event(TIME_CURRENT, process_running, STATE_RUNNING, STATE_READY, TRANS_TO_PREEMPT);
+                    Event * newEvent = new Event(TIME_CURRENT, process_running, STATE_RUNNING, TRANS_TO_PREEMPT);
                     eventQue->add_event(newEvent);
                 }
             }
+
+            // if (scheduler->preempt && (proc->state == STATE_BLOCKED || proc->state == STATE_CREATED)) {
+            // }
+
+            if (proc->state == STATE_BLOCKED) {
+                stats.process_stats[proc->pid].IT += proc->time_in_prev_state;
+            }
+
+            proc->state = STATE_READY;
             scheduler->add_process(proc);
             CALL_SCHEDULER = true;
             break;
@@ -574,13 +585,13 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
                     int time = TIME_CURRENT + quantum;
                     proc->time_cpu_remain -= quantum;
                     proc->cpu_burst -= quantum;
-                    newEvent = new Event(time, proc, STATE_RUNNING, STATE_READY, TRANS_TO_PREEMPT);
+                    newEvent = new Event(time, proc, STATE_RUNNING, TRANS_TO_PREEMPT);
                 }
                 // Done
                 else {
                     int time = TIME_CURRENT + proc->time_cpu_remain;
                     proc->time_cpu_remain = 0;
-                    newEvent = new Event(time, proc, STATE_RUNNING, STATE_DONE, TRANS_TO_DONE);
+                    newEvent = new Event(time, proc, STATE_RUNNING, TRANS_TO_DONE);
                 }
             }
             else {
@@ -589,13 +600,13 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
                     int time = TIME_CURRENT + proc->cpu_burst;
                     proc->time_cpu_remain -= proc->cpu_burst;
                     proc->cpu_burst = 0;
-                    newEvent = new Event(time, proc, STATE_RUNNING, STATE_BLOCKED, TRANS_TO_BLOCKED);
+                    newEvent = new Event(time, proc, STATE_RUNNING, TRANS_TO_BLOCKED);
                 }
                 // Done
                 else {
                     int time = TIME_CURRENT + proc->time_cpu_remain;
                     proc->time_cpu_remain = 0;
-                    newEvent = new Event(time, proc, STATE_RUNNING, STATE_DONE, TRANS_TO_DONE);
+                    newEvent = new Event(time, proc, STATE_RUNNING, TRANS_TO_DONE);
                 }
             }
             eventQue->add_event(newEvent);
@@ -606,8 +617,10 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
             //create an event for when process becomes READY again
             Event * newEvent;
             proc->state = STATE_BLOCKED;
+            process_running = nullptr;
             proc->io_burst = rand.randomInt(proc->max_io_burst);
 
+            // CPU busy time in STATE_READY
             stats.CPU_TIME += proc->time_in_prev_state;
 
             // IO
@@ -620,14 +633,11 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
                 stats.FT_IO = TIME_CURRENT + proc->io_burst;
             }
 
-            stats.process_stats[proc->pid].IT += proc->io_burst;
-
-            // Ready
+            // Blocked -> Ready
             int time = TIME_CURRENT + proc->io_burst;
-            newEvent = new Event(time, proc, STATE_BLOCKED, STATE_READY, TRANS_TO_READY);
+            newEvent = new Event(time, proc, STATE_BLOCKED, TRANS_TO_READY);
             eventQue->add_event(newEvent);
             CALL_SCHEDULER = true;
-            process_running = nullptr;
             break;
         }
 
@@ -643,10 +653,11 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
 
         case TRANS_TO_DONE: {
             proc->state = STATE_DONE;
+            process_running = nullptr;
+            proc->time_cpu_remain = 0;
+            CALL_SCHEDULER = true;
             stats.process_stats[proc->pid].FT = TIME_CURRENT;
             stats.CPU_TIME += proc->time_in_prev_state;
-            CALL_SCHEDULER = true;
-            process_running = nullptr;
             break;
         }
 
@@ -661,15 +672,14 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
             if (eventQue->next_event_time() == TIME_CURRENT) {
                 continue;
             }
-
             CALL_SCHEDULER = false;
-
             if (process_running == nullptr) {
                 process_running = scheduler->get_next_process();
-                if (process_running) {
-                    Event * newEvent = new Event(TIME_CURRENT, process_running, STATE_READY, STATE_RUNNING, TRANS_TO_RUNNING);
-                    eventQue->add_event(newEvent);
+                if (process_running == nullptr) {
+                    continue;
                 }
+                Event * newEvent = new Event(TIME_CURRENT, process_running, STATE_READY, TRANS_TO_RUNNING);
+                eventQue->add_event(newEvent);
             }
         }
     }
@@ -781,7 +791,7 @@ int main (int argc, char ** argv) {
         input >> IO;
         PRIO = rand.randomInt(maxPrio);
         Process * process = new Process(pid, AT, TC, CB, IO, PRIO);
-        Event * event = new Event(AT, process, STATE_CREATED, STATE_READY, TRANS_TO_READY);
+        Event * event = new Event(AT, process, STATE_CREATED, TRANS_TO_READY);
         event_que->add_event(event);
         stat procStat(pid, AT, TC, CB, IO, PRIO);
         stats.process_stats.push_back(procStat);
