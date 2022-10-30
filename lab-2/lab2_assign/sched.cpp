@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <list>
 #include <string>
+#include <vector>
 
 
 using namespace std;
@@ -43,6 +44,8 @@ public:
     int time_in_prev_state;
     int cpu_burst;
     int io_burst;
+    int time_cpu_remain_prev;
+    int cpu_burst_prev;
     
     Process(int id, int at, int tc, int cb, int io, int prio) {
         pid = id;
@@ -58,6 +61,8 @@ public:
         time_in_prev_state = 0;
         cpu_burst = 0;
         io_burst = 0;
+        time_cpu_remain_prev = 0;
+        cpu_burst_prev = 0;
     }
 
     ~Process() {};
@@ -119,6 +124,19 @@ public:
         }
     }
 
+    bool isEmpty() {
+        return que.empty();
+    }
+
+    int next_event_time() {
+        if (que.empty()) {
+            return -1;
+        }
+        else {
+            return que.front()->timestamp;
+        }
+    }
+
     EventQueue() {};
 
     ~EventQueue() {};
@@ -173,8 +191,9 @@ private:
 public:
     int randomInt(int burst) {
         ofs = ofs % size;
+        int randint = 1 + (randvals[ofs] % burst);
         ofs++;
-        return 1 + (randvals[ofs] % burst);
+        return randint;
     };
 
     Random(char * path) {
@@ -200,40 +219,219 @@ public:
 };
 
 
-void simulation (Scheduler * scheduler, EventQueue * que, int quantum) {
+struct stat 
+{
+    int PID;
+    int AT;
+    int TC;
+    int CB;
+    int IO;
+    int PRIO;
+    int FT;
+    int TT;
+    int IT;
+    int CW;
+    stat(int pid, int at, int tc, int cb, int io, int prio) {
+        PID = pid;
+        AT = at;
+        TC = tc;
+        CB = cb;
+        IO = io;
+        PRIO = prio;
+        FT = 0;
+        TT = 0;
+        IT = 0;
+        CW = 0;
+    }
+};
+
+class Stats
+{
+public:
+    int time_finished;
+    int CPU_UTIL;
+    int IO_UTIL;
+    int time_io_finished;
+    vector<stat> process_stats;
+
+    void print_scheduler(string scheduler_type) {
+        cout << scheduler_type << "\n";
+        int N = process_stats.size();
+        double TT = 0.0;
+        double CW = 0.0;
+        for(int i = 0; i < N; i++) {
+            printf("%04d: %4d %4d %4d %4d %1d | %5d %5d %5d %5d\n",
+                    process_stats[i].PID,
+                    process_stats[i].AT, process_stats[i].TC, process_stats[i].CB, process_stats[i].IO, process_stats[i].PRIO,
+                    process_stats[i].FT,
+                    process_stats[i].FT - process_stats[i].AT,
+                    process_stats[i].IT,
+                    process_stats[i].CW);
+            TT += process_stats[i].FT - process_stats[i].AT;
+            CW += process_stats[i].CW;
+        }
+        double CPU_UTIL_P = 100.0 * CPU_UTIL / time_finished;
+        double IO_UTIL_P = 100.0 * IO_UTIL / time_finished;
+        double TT_AVG = TT / N;
+        double CW_AVG = CW / N;
+        double throughput = 100.0 * N / time_finished;
+        printf("SUM: %d %.2lf %.2lf %.2lf %.2lf %.3lf\n",
+                time_finished,
+                CPU_UTIL_P,
+                IO_UTIL_P,
+                TT_AVG,
+                CW_AVG,
+                throughput);
+    }
+
+    Stats() {
+        time_finished = 0;
+        CPU_UTIL = 0;
+        IO_UTIL = 0;
+        time_io_finished = 0;
+    };
+
+    ~Stats() {};
+};
+
+
+void simulation (Scheduler * scheduler, EventQueue * eventQue, int quantum, Random &rand, Stats &stats) {
     Event * event;
     int time_current = 0;
     bool call_scheduler = false;
-    Process * process_running;
+    Process * process_running = nullptr;
 
-    while ((event = que->get_event())) {
+    while ((event = eventQue->get_event())) {
         Process * proc = event->process;
         time_current = event->timestamp;
         proc->time_in_prev_state = time_current - proc->timestamp_prev;
+        proc->timestamp_prev = time_current;
 
-        int transition = event->transition;
-
-        switch (transition)
+        switch (event->transition)
         {
-        case TRANS_TO_READY:
-            /* code */
-            break;
-        
-        case TRANS_TO_RUNNING:
-            /* code */
-            break;
+        case TRANS_TO_READY: {
+            // must come from BLOCKED or CREATED
+            // add to run queue, no event created
+            if (scheduler->preempt && process_running) {
+                int timestamp = 0;
+                // pq fix
+                list<Event *>::iterator iter;
+                for(iter = eventQue->que.begin(); iter != eventQue->que.end(); iter++) {
+                    if ((*iter)->process->pid == process_running->pid) {
+                        timestamp = (*iter)->timestamp;
+                        break;
+                    }
+                }
+                if (timestamp > 0 && timestamp != time_current && (proc->priority - 1) > process_running->priority_d) {
+                    process_running->time_cpu_remain = (*iter)->process->time_cpu_remain_prev - (time_current - process_running->timestamp_prev);
+                    process_running->cpu_burst = (*iter)->process->cpu_burst_prev - (time_current - process_running->timestamp_prev);
+                    eventQue->que.erase(iter);
+                    Event * newEvent = new Event(time_current, process_running, STATE_RUNNING, STATE_READY, TRANS_TO_PREEMPT);
+                    eventQue->add_event(newEvent);
+                }
 
-        case TRANS_TO_BLOCKED:
-            /* code */
+            }
+            scheduler->add_process(proc);
+            call_scheduler = true;
             break;
+        }
 
-        case TRANS_TO_PREEMPT:
-            /* code */
-            break;
+        case TRANS_TO_RUNNING: {
+            // create event for either preemption or blocking
+            Event * newEvent;
+            proc->state = STATE_RUNNING;
+            process_running = proc;
 
-        case TRANS_TO_DONE:
-            /* code */
+            if (proc->cpu_burst == 0) {
+                proc->cpu_burst = min(rand.randomInt(proc->max_cpu_burst), proc->time_cpu_remain);
+            }
+
+            stats.process_stats[proc->pid].CW += proc->time_in_prev_state;
+
+            proc->time_cpu_remain_prev = proc->time_cpu_remain;
+            proc->cpu_burst_prev = proc->cpu_burst;
+
+            if (proc->cpu_burst > quantum) {
+                // Preempt
+                if (proc->time_cpu_remain > quantum) {
+                    int time = time_current + quantum;
+                    proc->time_cpu_remain -= quantum;
+                    proc->cpu_burst -= quantum;
+                    newEvent = new Event(time, proc, STATE_RUNNING, STATE_READY, TRANS_TO_PREEMPT);
+                }
+                // Done
+                else {
+                    int time = time_current + proc->time_cpu_remain;
+                    proc->time_cpu_remain = 0;
+                    newEvent = new Event(time, proc, STATE_RUNNING, STATE_DONE, TRANS_TO_DONE);
+                }
+            }
+            else {
+                // Blocked
+                if (proc->time_cpu_remain > proc->cpu_burst) {
+                    int time = time_current + proc->cpu_burst;
+                    proc->time_cpu_remain -= proc->cpu_burst;
+                    proc->cpu_burst = 0;
+                    newEvent = new Event(time, proc, STATE_RUNNING, STATE_BLOCKED, TRANS_TO_BLOCKED);
+                }
+                // Done
+                else {
+                    int time = time_current + proc->time_cpu_remain;
+                    proc->time_cpu_remain = 0;
+                    newEvent = new Event(time, proc, STATE_RUNNING, STATE_DONE, TRANS_TO_DONE);
+                }
+            }
+            eventQue->add_event(newEvent);
             break;
+        }
+
+        case TRANS_TO_BLOCKED: {
+            //create an event for when process becomes READY again
+            Event * newEvent;
+            proc->state = STATE_BLOCKED;
+            proc->io_burst = rand.randomInt(proc->max_io_burst);
+
+            stats.CPU_UTIL += proc->time_in_prev_state;
+
+            // IO
+            if (time_current > stats.time_io_finished) {
+                stats.IO_UTIL += proc->io_burst;
+                stats.time_io_finished = time_current + proc->io_burst;
+            }
+            else if (time_current + proc->io_burst > stats.time_io_finished) {
+                stats.IO_UTIL += (time_current + proc->io_burst - stats.time_io_finished);
+                stats.time_io_finished = time_current + proc->io_burst;
+            }
+
+            stats.process_stats[proc->pid].IT += proc->io_burst;
+
+            // Ready
+            int time = time_current + proc->io_burst;
+            newEvent = new Event(time, proc, STATE_BLOCKED, STATE_READY, TRANS_TO_READY);
+            eventQue->add_event(newEvent);
+            call_scheduler = true;
+            process_running = nullptr;
+            break;
+        }
+
+        case TRANS_TO_PREEMPT: {
+            // must come from RUNNING (preemption)
+            // add to runqueue (no event is generated)
+            stats.CPU_UTIL += proc->time_in_prev_state;
+            scheduler->add_process(proc);
+            call_scheduler = true;
+            process_running = nullptr;
+            break;
+        }
+
+        case TRANS_TO_DONE: {
+            proc->state = STATE_DONE;
+            stats.process_stats[proc->pid].FT = time_current;
+            stats.CPU_UTIL += proc->time_in_prev_state;
+            call_scheduler = true;
+            process_running = nullptr;
+            break;
+        }
 
         default:
             break;
@@ -243,29 +441,44 @@ void simulation (Scheduler * scheduler, EventQueue * que, int quantum) {
         event = nullptr;
 
         if (call_scheduler) {
+            if (eventQue->next_event_time() == time_current) {
+                continue;
+            }
 
+            call_scheduler = false;
+
+            if (process_running == nullptr) {
+                process_running = scheduler->get_next_process();
+                if (process_running) {
+                    Event * newEvent = new Event(time_current, process_running, STATE_READY, STATE_RUNNING, TRANS_TO_RUNNING);
+                    eventQue->add_event(newEvent);
+                }
+            }
         }
     }
+    stats.time_finished = time_current;
 }
 
 
 
 int main (int argc, char ** argv) {
     int verbose = 0;
-    int quantum = 10;
+    int quantum = 10000;
     int maxPrio = 4;    // default max priority
     int c;
     string scheduler_type;
+    Stats stats = Stats();
 
     // read arguments
-    while ((c = getopt(argc, argv, "vs:")) != -1) {
+    while ((c = getopt(argc, argv, "s:v")) != -1) {
         switch (c)
         {
+        case 's':
+            scheduler_type = optarg;
+            break;
         case 'v':
             verbose = 1;
             break;
-        case 's':
-            scheduler_type = optarg;
         default:
             break;
         }
@@ -289,7 +502,7 @@ int main (int argc, char ** argv) {
     }
 
     // create event queue
-    EventQueue * que = new EventQueue();
+    EventQueue * event_que = new EventQueue();
 
     // read input file
     char * path_input = argv[optind];
@@ -307,7 +520,7 @@ int main (int argc, char ** argv) {
     int TC;
     int CB;
     int IO;
-    int priority;
+    int PRIO;
 
     while (!input.eof()) {
         input >> AT;
@@ -317,17 +530,19 @@ int main (int argc, char ** argv) {
         input >> TC;
         input >> CB;
         input >> IO;
-        priority = rand.randomInt(maxPrio);
-        Process * process = new Process(pid, AT, TC, CB, IO, priority);
+        PRIO = rand.randomInt(maxPrio);
+        Process * process = new Process(pid, AT, TC, CB, IO, PRIO);
         Event * event = new Event(AT, process, STATE_CREATED, STATE_READY, TRANS_TO_READY);
-        que->add_event(event);
+        event_que->add_event(event);
+        stat procStat(pid, AT, TC, CB, IO, PRIO);
+        stats.process_stats.push_back(procStat);
         pid++;
-
-        printf("%d --- %d, %d, %d, %d \n", pid, AT, TC, CB, IO);
     }
     input.close();
 
-    // simulation(scheduler, que, quantum);
+    simulation(scheduler, event_que, quantum, rand, stats);
+
+    stats.print_scheduler(scheduler->scheduler_type);
 
     return 0;
 }
