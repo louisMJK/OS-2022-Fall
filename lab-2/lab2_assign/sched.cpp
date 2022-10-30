@@ -336,6 +336,68 @@ public:
     }
 };
 
+class PREPRIO: public Scheduler
+{
+private:
+    list<Process * > activeQ;
+    list<Process *> expiredQ;
+
+public:
+    void add_process(Process * p) {
+        if (p->state == STATE_RUNNING) {
+            p->priority_d -= 1;
+        }
+        else {
+            p->priority_d = p->priority - 1;
+        }
+        p->state = STATE_READY;
+        list<Process *>::iterator iter;
+        if (p->priority_d >= 0) {
+            for (iter = activeQ.begin(); iter != activeQ.end(); iter++) {
+                if (p->priority_d > (*iter)->priority_d) {
+                    activeQ.insert(iter, p);
+                    break;
+                }
+            }
+            if (iter == activeQ.end()) {
+                activeQ.push_back(p);
+            }
+        }
+        else {
+            p->priority_d = p->priority - 1;
+            for (iter = expiredQ.begin(); iter != expiredQ.end(); iter++) {
+                if (p->priority_d > (*iter)->priority_d) {
+                    expiredQ.insert(iter, p);
+                    break;
+                }
+            }
+            if (iter == expiredQ.end()) {
+                expiredQ.push_back(p);
+            }
+        }
+    }
+
+    Process * get_next_process() {
+        if (activeQ.empty()) {
+            activeQ.swap(expiredQ);
+        }
+        if (activeQ.empty()) {
+            return nullptr;
+        }
+        else {
+            Process * p = activeQ.front();
+            activeQ.pop_front();
+            return p;
+        }
+    }
+
+    PREPRIO(int quant) {
+        scheduler_type = "PREPRIO " + to_string(quant);
+        quantum = quant;
+        preempt = true;
+    }
+};
+
 
 class Random
 {
@@ -478,13 +540,13 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
                         break;
                     }
                 }
-                // if (timestamp > 0 && timestamp != TIME_CURRENT && (proc->priority - 1) > process_running->priority_d) {
-                //     process_running->time_cpu_remain = (*iter)->process->time_cpu_remain_prev - (TIME_CURRENT - process_running->state_TS);
-                //     process_running->cpu_burst = (*iter)->process->cpu_burst_prev - (TIME_CURRENT - process_running->state_TS);
-                //     eventQue->que.erase(iter);
-                //     Event * newEvent = new Event(TIME_CURRENT, process_running, STATE_RUNNING, STATE_READY, TRANS_TO_PREEMPT);
-                //     eventQue->add_event(newEvent);
-                // }
+                if (timestamp > 0 && timestamp != TIME_CURRENT && (proc->priority - 1) > process_running->priority_d) {
+                    process_running->time_cpu_remain = (*iter)->process->time_cpu_remain_prev - (TIME_CURRENT - process_running->state_TS);
+                    process_running->cpu_burst = (*iter)->process->cpu_burst_prev - (TIME_CURRENT - process_running->state_TS);
+                    eventQue->que.erase(iter);
+                    Event * newEvent = new Event(TIME_CURRENT, process_running, STATE_RUNNING, STATE_READY, TRANS_TO_PREEMPT);
+                    eventQue->add_event(newEvent);
+                }
             }
             scheduler->add_process(proc);
             CALL_SCHEDULER = true;
@@ -619,7 +681,7 @@ void simulation (Scheduler * scheduler, EventQueue * eventQue, Random &rand, Sta
 int main (int argc, char ** argv) {
     int verbose = 0;
     int quantum = 10000;
-    int maxPrio = 4;    // default max priority
+    int maxPrio = 4;        // default max priority
     int c;
     string scheduler_type;
     Stats stats = Stats();
@@ -670,6 +732,18 @@ int main (int argc, char ** argv) {
             quantum = stoi(scheduler_type.substr(1, string::npos));
         }
         scheduler = new PRIO(quantum);
+        break;
+    }
+    case 'E': {
+        int split = scheduler_type.find(":");
+        if (split != string::npos) {
+            quantum = stoi(scheduler_type.substr(1, split));
+            maxPrio = stoi(scheduler_type.substr(split + 1, string::npos));
+        }
+        else {
+            quantum = stoi(scheduler_type.substr(1, string::npos));
+        }
+        scheduler = new PREPRIO(quantum);
         break;
     }
     default:
