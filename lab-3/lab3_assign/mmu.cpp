@@ -14,21 +14,51 @@ const int MAX_VPAGES = 64;
 const int MAX_FRAMES = 128;
 
 
-struct pte_t {
+struct pte_t 
+{
     unsigned int valid:1;
     unsigned int referenced:1;
     unsigned int modified:1;
     unsigned int write_protect:1;
     unsigned int paged_out:1;
-    unsigned int frameAddress:7;
+    unsigned int frame_address:7;
 
     unsigned int file_mapped:1;
 };
 
 
-struct frame_t {
-
+struct frame_t 
+{
+    bool allocated;
+    int pid;
+    int vpage;
 };
+
+
+// maintain reverse mappings to the process and the vpage that maps a particular frame
+frame_t frame_table[MAX_FRAMES];    // physical frames
+pte_t page_table[MAX_VPAGES];       // virtual pages -> physical frames
+
+
+struct instruction
+{
+    char op;
+    int val;
+    instruction(char instruction, int value) {
+        op = instruction;
+        val = value;
+    }
+};
+
+
+class Pager
+{
+public:
+    virtual frame_t *select_victim_frame() = 0;
+    Pager(/* args */);
+    ~Pager() {};
+};
+
 
 
 class VMA
@@ -59,17 +89,20 @@ public:
     int pid;
     int numVMA;
     vector<VMA *> VMAList;
+    pte_t *pageTable;
 
-    Process(int id, vector<VMA *> vmaList) {
+    Process(int id, vector<VMA *> vmaList, pte_t *page_table) {
         pid = id;
         VMAList = vmaList;
         numVMA = VMAList.size();
+        pageTable = page_table;
     };
 
     Process() {};
 
     ~Process() {};
 };
+
 
 
 void simulation () {
@@ -80,7 +113,6 @@ void simulation () {
 
 
 int main (int argc, char **argv) {
-
     // get arguments
     int c;
     int num_frames;
@@ -108,14 +140,13 @@ int main (int argc, char **argv) {
     string path_rand = argv[optind + 1];
     ifstream input;
     string line;
-
     int N;
     int index = 0;
     int pid = 0;
     vector<Process *> processList;
+    vector<instruction> instructionList;
 
     input.open(path_input);
-
     while (!input.eof()) {
         getline(input, line);
         if (input.eof()) {
@@ -130,9 +161,10 @@ int main (int argc, char **argv) {
             N = stoi(line);
         }
         else if (line.length() == 1) {
-            // read VMAs
-            int numVMA = stoi(line);
             vector<VMA *> VMAList;
+            pte_t page_table[MAX_VPAGES];
+            int numVMA = stoi(line);
+            
             int start_page;
             int end_page;
             int write_protected;
@@ -142,20 +174,23 @@ int main (int argc, char **argv) {
                 VMA *vma = new VMA(start_page, end_page, write_protected, file_mapped);
                 VMAList.push_back(vma);
             }
-            Process *proc = new Process(pid, VMAList);
+            Process *proc = new Process(pid, VMAList, page_table);
             processList.push_back(proc);
             pid++;
         }
         else {
             // read instructions
-            // cout << line << endl;
+            char op = line[0];
+            int val = stoi(line.substr(2));
+            instruction ins(op, val);
+            instructionList.push_back(ins);
         }
         index++;
     }
     input.close();
 
 
-    // parsed input
+    // parsed input: processList -> VMAList
     for (int i = 0; i < N; i++) {
         Process *p = processList[i];
         cout << "Process: " << p->pid << endl;
@@ -164,7 +199,13 @@ int main (int argc, char **argv) {
             printf("\t%d %d %d %d\n", vma->start_page, vma->end_page, vma->write_protected, vma->file_mapped);
         }
     }
+    cout << "Instructions:" << endl;
+    for (int i = 0; i < instructionList.size(); i++) {
+        cout << instructionList[i].op << " " << instructionList[i].val << endl;
+    }
 
+    // simulation
+    simulation();
 
 
     return 0;
