@@ -7,7 +7,7 @@ shift 3
 PARGS=${*:--oOPFS}
 
 INPUTS=`seq 1 11`
-ALGOS="f r c e a w"
+ALGOS="f"
 FRAMES="16 32"
 
 for I in ${INPUTS}; do

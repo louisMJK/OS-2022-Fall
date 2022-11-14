@@ -5,39 +5,38 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <vector>
+#include <string>
+#include <deque>
 
 
 using namespace std;
 
 
 const int MAX_VPAGES = 64;
-const int MAX_FRAMES = 128;
 
 
 struct pte_t 
 {
-    unsigned int valid:1;
+    // initialized to 0
+    unsigned int present:1;
     unsigned int referenced:1;
     unsigned int modified:1;
     unsigned int write_protect:1;
     unsigned int paged_out:1;
-    unsigned int frame_address:7;
+    unsigned int frame_index:7;
 
     unsigned int file_mapped:1;
+    // valid addresses?
 };
 
 
 struct frame_t 
 {
+    // frame -> PTE
     bool allocated;
     int pid;
     int vpage;
 };
-
-
-// maintain reverse mappings to the process and the vpage that maps a particular frame
-frame_t frame_table[MAX_FRAMES];    // physical frames
-pte_t page_table[MAX_VPAGES];       // virtual pages -> physical frames
 
 
 struct instruction
@@ -51,34 +50,18 @@ struct instruction
 };
 
 
-class Pager
+struct VMA
 {
-public:
-    virtual frame_t *select_victim_frame() = 0;
-    Pager(/* args */);
-    ~Pager() {};
-};
-
-
-
-class VMA
-{
-public:
     int start_page;
     int end_page;
     int write_protected;
     int file_mapped;
-
     VMA(int start, int end, int writeProteced, int fileMapped) {
         start_page = start;
         end_page = end;
         write_protected = writeProteced;
         file_mapped = fileMapped;
     };
-
-    VMA() {};
-
-    ~VMA() {};
 };
 
 
@@ -88,10 +71,10 @@ class Process
 public:
     int pid;
     int numVMA;
-    vector<VMA *> VMAList;
+    vector<VMA> VMAList;
     pte_t *pageTable;
 
-    Process(int id, vector<VMA *> vmaList, pte_t *page_table) {
+    Process(int id, vector<VMA> vmaList, pte_t *page_table) {
         pid = id;
         VMAList = vmaList;
         numVMA = VMAList.size();
@@ -104,10 +87,130 @@ public:
 };
 
 
+// deque, frames
+class Pager
+{
+public:
+    virtual int select_victim_frame_index() {return -1;};
+    Pager() {};
+    ~Pager() {};
+};
 
-void simulation () {
-    frame_t frame_table[MAX_FRAMES];
-    pte_t page_table[MAX_VPAGES];
+class Pager_FIFO: public Pager
+{
+public:
+    deque<int> que;
+
+    int select_victim_frame_index() {
+        return -1;
+    }
+
+    Pager_FIFO(/* args */) {};
+
+    ~Pager_FIFO() {};
+};
+
+
+void simulation (int num_frames, vector<Process *> process_list, vector<instruction> instr_list, Pager *pager) {
+    frame_t frame_table[num_frames]; 
+    deque<int> free_frame_list;
+    int pid;
+    int vpage;
+    Process *proc_curr;
+    vector<VMA> VMAList;
+
+    for (int i = 0; i < num_frames; i++) {
+        free_frame_list.push_back(i);
+        frame_table[i].allocated = false;
+        frame_table[i].pid = -1;
+        frame_table[i].vpage = -1;
+    }
+
+    // instructions
+    for (int i = 0; i < instr_list.size(); i++) {
+        char op = instr_list[i].op;
+        int val = instr_list[i].val;
+        cout << i << ": ==> " << op << " " << val << endl;
+
+        if (op == 'c') {
+            pid = val;
+            proc_curr = process_list[pid];
+            continue;
+        }
+        if (op == 'e') {
+            continue;
+        }
+
+        // read or write instruction
+        vpage = val;
+        pte_t *pte = &proc_curr->pageTable[vpage];
+
+        // page fault exception
+        if (!pte->present) {
+            // verify this is actually a valid page in a vma, if not raise error and next inst
+            bool isValid = false;
+            VMAList = proc_curr->VMAList;
+            for (int j = 0; j < VMAList.size(); j++) {
+                VMA vma = VMAList[j];
+                if (vpage >= vma.start_page && vpage <= vma.end_page) {
+                    isValid = true;
+                    break;
+                }
+            }
+            if (!isValid) {
+                cout << " SEGV" << endl;
+                continue;
+            }
+
+            // vpage valid -> get new frame
+            int new_frame_idx;
+            if (!free_frame_list.empty()) {
+                new_frame_idx = free_frame_list[0];
+                free_frame_list.pop_front();
+            }
+            else {
+                new_frame_idx = pager->select_victim_frame_index();
+            }
+            frame_t frame_new = frame_table[new_frame_idx];
+
+            // PTE
+            int pid_prev = frame_new.pid;
+            int vpage_prev = frame_new.vpage;
+            Process *proc_prev = process_list[pid_prev];
+            pte_t *pte_prev = &proc_prev->pageTable[vpage_prev];
+
+            if (frame_new.allocated) {
+                // Unmap frame from user
+                printf(" UNMAP %d:%d\n", pid_prev, vpage_prev);
+                if (pte_prev->modified == 1) {
+                    cout << " OUT" << endl;
+                }
+                if (pte_prev->file_mapped == 1) {
+                    cout << " FOUT" << endl;
+                    cout << " FIN" << endl;
+                }
+                if (pte_prev->paged_out == 1) {
+                    cout << " IN" << endl;
+                }
+                if (pte_prev->paged_out == 0 && pte_prev->file_mapped == 0) {
+                    cout << " ZERO" << endl;
+                }
+                pte_prev->paged_out = 1;
+            }
+            else {
+                if (pte_prev->paged_out == 1) {
+                    cout << " IN" << endl;
+                }
+                if (pte_prev->file_mapped == 1) {
+                    cout << " FIN" << endl;
+                }
+            }
+        }
+
+        // now the page is definitely present
+        // check write protection
+        // simulate instruction execution by hardware by updating the R/M PTE bits
+    }
 
 }
 
@@ -115,7 +218,7 @@ void simulation () {
 int main (int argc, char **argv) {
     // get arguments
     int c;
-    int num_frames;
+    int num_frames = 128;
     string algo;
     string options;
     while ((c = getopt(argc, argv, "f:a:o:")) != -1) {
@@ -134,8 +237,20 @@ int main (int argc, char **argv) {
         }
     }
 
+    // create Pager
+    Pager *pager;
+    switch (algo[0])
+    {
+    case 'f':
+        pager = new Pager_FIFO();
+        break;
+    
+    default:
+        break;
+    }
 
-    // read input
+
+    // creat Processes(VMA, page_table) and Instructions
     string path_input = argv[optind];
     string path_rand = argv[optind + 1];
     ifstream input;
@@ -161,8 +276,8 @@ int main (int argc, char **argv) {
             N = stoi(line);
         }
         else if (line.length() == 1) {
-            vector<VMA *> VMAList;
-            pte_t page_table[MAX_VPAGES];
+            vector<VMA> VMAList;
+            pte_t page_table[MAX_VPAGES] = {0};     // PTEs initialzed to 0
             int numVMA = stoi(line);
             
             int start_page;
@@ -171,7 +286,7 @@ int main (int argc, char **argv) {
             int file_mapped;
             for (int i = 0; i < numVMA; i++) {
                 input >> start_page >> end_page >> write_protected >> file_mapped;
-                VMA *vma = new VMA(start_page, end_page, write_protected, file_mapped);
+                VMA vma(start_page, end_page, write_protected, file_mapped);
                 VMAList.push_back(vma);
             }
             Process *proc = new Process(pid, VMAList, page_table);
@@ -189,24 +304,8 @@ int main (int argc, char **argv) {
     }
     input.close();
 
-
-    // parsed input: processList -> VMAList
-    for (int i = 0; i < N; i++) {
-        Process *p = processList[i];
-        cout << "Process: " << p->pid << endl;
-        for (int j = 0; j < p->numVMA; j++) {
-            VMA *vma = p->VMAList[j];
-            printf("\t%d %d %d %d\n", vma->start_page, vma->end_page, vma->write_protected, vma->file_mapped);
-        }
-    }
-    cout << "Instructions:" << endl;
-    for (int i = 0; i < instructionList.size(); i++) {
-        cout << instructionList[i].op << " " << instructionList[i].val << endl;
-    }
-
     // simulation
-    simulation();
-
+    simulation(num_frames, processList, instructionList, pager);
 
     return 0;
 }
