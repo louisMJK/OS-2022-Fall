@@ -92,6 +92,7 @@ class Pager
 {
 public:
     virtual int select_victim_frame_index() {return -1;};
+    virtual void add_frame(int idx) {};
     Pager() {};
     ~Pager() {};
 };
@@ -99,19 +100,74 @@ public:
 class Pager_FIFO: public Pager
 {
 public:
-    deque<int> que;
+    deque<int> q;
 
     int select_victim_frame_index() {
-        return -1;
+        if (q.empty()) {
+            return -1;
+        }
+        int idx = q.front();
+        q.pop_front();
+        return idx;
     }
 
-    Pager_FIFO(/* args */) {};
+    void add_frame(int idx) {
+        q.push_back(idx);
+    }
+
+    Pager_FIFO() {};
 
     ~Pager_FIFO() {};
 };
 
 
-void simulation (int num_frames, vector<Process *> process_list, vector<instruction> instr_list, Pager *pager) {
+class Stats
+{
+public:
+    int proc_count;
+    unsigned long inst_count;
+    unsigned long ctx_switches;
+    unsigned long process_exits;
+    unsigned long long cost;
+    Stats() {
+        proc_count = 0;
+        inst_count = 0;
+        ctx_switches = 0;
+        process_exits = 0;
+        cost = 0;
+    };
+    ~Stats() {};
+};
+
+
+class PStat
+{
+public:
+    unsigned long unmaps;
+    unsigned long maps;
+    unsigned long ins;
+    unsigned long outs;
+    unsigned long fins;
+    unsigned long fouts;
+    unsigned long zeros;
+    unsigned long segv;
+    unsigned long segprot;
+    PStat() {
+        unmaps = 0;
+        maps = 0;
+        ins = 0;
+        outs = 0;
+        fins = 0;
+        fouts = 0;
+        zeros = 0;
+        segv = 0;
+        segprot = 0;
+    };
+    ~PStat() {};
+};
+
+
+void simulation (int num_frames, vector<Process *> process_list, vector<instruction> instr_list, Pager *pager, Stats *stats, PStat *pstats) {
     frame_t frame_table[num_frames]; 
     deque<int> free_frame_list;
     int pid;
@@ -130,16 +186,22 @@ void simulation (int num_frames, vector<Process *> process_list, vector<instruct
     for (int i = 0; i < instr_list.size(); i++) {
         char op = instr_list[i].op;
         int val = instr_list[i].val;
+
         cout << i << ": ==> " << op << " " << val << endl;
 
         if (op == 'c') {
             pid = val;
             proc_curr = process_list[pid];
+            stats->ctx_switches++;
+            stats->cost += 130;
             continue;
         }
         if (op == 'e') {
+            stats->process_exits++;
+            stats->cost += 1250;
             continue;
         }
+        stats->cost += 1;
 
         // read or write instruction
         vpage = val;
@@ -159,6 +221,8 @@ void simulation (int num_frames, vector<Process *> process_list, vector<instruct
             }
             if (!isValid) {
                 cout << " SEGV" << endl;
+                pstats[proc_curr->pid].segv++;
+                stats->cost += 340;
                 continue;
             }
 
@@ -170,48 +234,125 @@ void simulation (int num_frames, vector<Process *> process_list, vector<instruct
             }
             else {
                 new_frame_idx = pager->select_victim_frame_index();
+                // cout << " victim frame: " << new_frame_idx << endl;
             }
-            frame_t frame_new = frame_table[new_frame_idx];
+            frame_t *frame_new = &frame_table[new_frame_idx];
 
-            // PTE
-            int pid_prev = frame_new.pid;
-            int vpage_prev = frame_new.vpage;
-            Process *proc_prev = process_list[pid_prev];
-            pte_t *pte_prev = &proc_prev->pageTable[vpage_prev];
+            // Pager, FIFO???
+            pager->add_frame(new_frame_idx);
 
-            if (frame_new.allocated) {
-                // Unmap frame from user
+            // update PTE
+            pte->present = 1;
+            pte->frame_index = new_frame_idx;
+
+            // frame is mapped -> Unmap
+            if (frame_new->allocated) {
+                int pid_prev = frame_new->pid;
+                int vpage_prev = frame_new->vpage;
+                Process *proc_prev = process_list[pid_prev];
+                pte_t *pte_prev = &proc_prev->pageTable[vpage_prev];
+
                 printf(" UNMAP %d:%d\n", pid_prev, vpage_prev);
-                if (pte_prev->modified == 1) {
+                pstats[proc_curr->pid].unmaps++;
+                stats->cost += 400;
+
+                if (pte_prev->modified) {
                     cout << " OUT" << endl;
+                    pstats[proc_curr->pid].outs++;
+                    stats->cost += 2700;
                 }
-                if (pte_prev->file_mapped == 1) {
-                    cout << " FOUT" << endl;
-                    cout << " FIN" << endl;
-                }
-                if (pte_prev->paged_out == 1) {
-                    cout << " IN" << endl;
-                }
-                if (pte_prev->paged_out == 0 && pte_prev->file_mapped == 0) {
-                    cout << " ZERO" << endl;
-                }
-                pte_prev->paged_out = 1;
-            }
-            else {
-                if (pte_prev->paged_out == 1) {
-                    cout << " IN" << endl;
-                }
-                if (pte_prev->file_mapped == 1) {
-                    cout << " FIN" << endl;
+
+                // update old PTE
+                pte_prev->present = 0;
+                if (pte_prev->modified) {
+                    pte_prev->paged_out = 1;
                 }
             }
+
+            // update frame
+            frame_new->allocated = true;
+            frame_new->pid = proc_curr->pid;
+            frame_new->vpage = vpage;
+
+
+            if (!pte->paged_out && !pte->file_mapped) {
+                cout << " ZERO" << endl;
+                pstats[proc_curr->pid].zeros++;
+                stats->cost += 140;
+            }
+
+            cout << " Map " << pte->frame_index << endl;
+            pstats[proc_curr->pid].maps++;
+            stats->cost += 300;
         }
 
         // now the page is definitely present
         // check write protection
         // simulate instruction execution by hardware by updating the R/M PTE bits
-    }
+        if (op == 'w') {
+            if (pte->write_protect) {
+                cout << " SEGPROT" << endl;
+                pte->referenced = 1;
+                pstats[proc_curr->pid].segprot++;
+            }
+            else {
+                pte->referenced = 1;
+                pte->modified = 1;
+            }
+        }
 
+        if (op == 'r') {
+            pte->referenced = 1;
+        }
+
+    }
+}
+
+
+void print_stats(Stats *stats, PStat *pstats, vector<Process *> processList) {
+    for (int i = 0; i < stats->proc_count; i++) {
+        Process *p = processList[i];
+        pte_t *pt = p->pageTable;
+        printf("PT[%d]:", i);
+        for (int j = 0; j < MAX_VPAGES; j++) {
+            if (!pt[j].present) {
+                if (pt[j].paged_out) {
+                    cout << " #";
+                }
+                else {
+                    cout << " *";
+                }
+                continue;
+            }
+            printf(" %d:", j);
+            if (pt[j].referenced) {
+                cout << "R";
+            } else {
+                cout << "-";
+            }
+            if (pt[j].modified) {
+                cout << "M";
+            } else {
+                cout << "-";
+            }
+            if (pt[j].paged_out) {
+                cout << "S";
+            } else {
+                cout << "-";
+            }
+
+        }
+    }
+    cout << endl;
+    for (int i = 0; i < stats->proc_count; i++) {
+        printf("PROC[%d]: U=%lu M=%lu I=%lu O=%lu FI=%lu FO=%lu Z=%lu SV=%lu SP=%lu\n",
+                i,
+                pstats[i].unmaps, pstats[i].maps, pstats[i].ins, pstats[i].outs,
+                pstats[i].fins, pstats[i].fouts, pstats[i].zeros,
+                pstats[i].segv, pstats[i].segprot);
+    }
+    printf("TOTALCOST %lu %lu %lu %llu %lu\n", 
+            stats->inst_count, stats->ctx_switches, stats->process_exits, stats->cost, sizeof(pte_t));
 }
 
 
@@ -244,7 +385,6 @@ int main (int argc, char **argv) {
     case 'f':
         pager = new Pager_FIFO();
         break;
-    
     default:
         break;
     }
@@ -304,8 +444,17 @@ int main (int argc, char **argv) {
     }
     input.close();
 
+
+    Stats *stats = new Stats();
+    stats->proc_count = processList.size();
+    stats->inst_count = instructionList.size();
+    PStat pstats[processList.size()];
+
     // simulation
-    simulation(num_frames, processList, instructionList, pager);
+    simulation(num_frames, processList, instructionList, pager, stats, pstats);
+
+    // print info
+    print_stats(stats, pstats, processList);
 
     return 0;
 }
