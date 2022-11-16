@@ -197,9 +197,6 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
 
     for (int i = 0; i < MAX_FRAMES; i++) {
         free_frame_list.push_back(i);
-        frame_table[i].allocated = false;
-        frame_table[i].pid = -1;
-        frame_table[i].vpage = -1;
     }
 
     // instructions
