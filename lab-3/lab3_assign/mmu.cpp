@@ -189,6 +189,7 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
 
         cout << i << ": ==> " << op << " " << val << endl;
 
+        // read or write instruction
         if (op == 'c') {
             pid = val;
             proc_curr = process_list[pid];
@@ -203,7 +204,6 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
         }
         stats->cost += 1;
 
-        // read or write instruction
         vpage = val;
         pte_t *pte = &proc_curr->pageTable[vpage];
 
@@ -211,11 +211,13 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
         if (!pte->present) {
             // verify this is actually a valid page in a vma, if not raise error and next inst
             bool isValid = false;
+            int write_protect = 0;
             VMAList = proc_curr->VMAList;
             for (int j = 0; j < VMAList.size(); j++) {
                 VMA vma = VMAList[j];
                 if (vpage >= vma.start_page && vpage <= vma.end_page) {
                     isValid = true;
+                    write_protect = vma.write_protected;
                     break;
                 }
             }
@@ -225,6 +227,7 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
                 stats->cost += 340;
                 continue;
             }
+            pte->write_protect = write_protect;
 
             // vpage valid -> get new frame
             int new_frame_idx;
@@ -306,6 +309,7 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
                 cout << " SEGPROT" << endl;
                 pte->referenced = 1;
                 pstats[proc_curr->pid].segprot++;
+                stats->cost += 420;
             }
             else {
                 pte->referenced = 1;
@@ -316,7 +320,6 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
         if (op == 'r') {
             pte->referenced = 1;
         }
-
     }
 }
 
