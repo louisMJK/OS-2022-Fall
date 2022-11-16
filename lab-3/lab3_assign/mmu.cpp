@@ -211,13 +211,15 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
         if (!pte->present) {
             // verify this is actually a valid page in a vma, if not raise error and next inst
             bool isValid = false;
-            int write_protect = 0;
+            int write_protected = 0;
+            int file_mapped = 0;
             VMAList = proc_curr->VMAList;
             for (int j = 0; j < VMAList.size(); j++) {
                 VMA vma = VMAList[j];
                 if (vpage >= vma.start_page && vpage <= vma.end_page) {
                     isValid = true;
-                    write_protect = vma.write_protected;
+                    write_protected = vma.write_protected;
+                    file_mapped = vma.file_mapped;
                     break;
                 }
             }
@@ -227,7 +229,8 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
                 stats->cost += 340;
                 continue;
             }
-            pte->write_protect = write_protect;
+            pte->write_protect = write_protected;
+            pte->file_mapped = file_mapped;
 
             // vpage valid -> get new frame
             int new_frame_idx;
@@ -260,22 +263,25 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
                 stats->cost += 400;
 
                 if (pte_prev->modified) {
-                    cout << " OUT" << endl;
-                    pstats[proc_curr->pid].outs++;
-                    stats->cost += 2700;
+                    if (!pte_prev->file_mapped) {
+                        cout << " OUT" << endl;
+                        pstats[proc_curr->pid].outs++;
+                        stats->cost += 2700;
+                    }
+                    else {
+                        cout << " FOUT" << endl;
+                        pstats[proc_curr->pid].fouts++;
+                        stats->cost += 2400;
+                    }
                 }
-
-                // if (pte_prev->paged_out) {
-                //     cout << " IN" << endl;
-                //     pstats[proc_curr->pid].ins++;
-                //     stats->cost += 3100;
-                // }
 
                 // update old PTE
                 pte_prev->present = 0;
                 if (pte_prev->modified) {
-                    pte_prev->paged_out = 1;
                     pte_prev->modified = 0;
+                    if (!pte_prev->file_mapped) {
+                        pte_prev->paged_out = 1;
+                    }
                 }
             }
 
@@ -284,10 +290,16 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
             frame_new->pid = proc_curr->pid;
             frame_new->vpage = vpage;
 
-            if (pte->paged_out) {
+            if (pte->paged_out && !pte->file_mapped) {
                 cout << " IN" << endl;
                 pstats[proc_curr->pid].ins++;
                 stats->cost += 3100;
+            }
+
+            if (pte->file_mapped) {
+                cout << " FIN" << endl;
+                pstats[proc_curr->pid].fins++;
+                stats->cost += 2800;
             }
 
             if (!pte->paged_out && !pte->file_mapped) {
@@ -356,7 +368,6 @@ void print_stats(Stats *stats, PStat *pstats, frame_t *frame_table, vector<Proce
             } else {
                 cout << "-";
             }
-
         }
     }
     cout << endl;
