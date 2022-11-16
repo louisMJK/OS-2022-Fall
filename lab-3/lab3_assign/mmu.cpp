@@ -34,7 +34,7 @@ struct pte_t
 struct frame_t 
 {
     // frame -> PTE
-    bool allocated;
+    int allocated;
     int pid;
     int vpage;
 };
@@ -112,13 +112,33 @@ public:
         return idx;
     }
 
-    void add_frame(int idx) {
-        q.push_back(idx);
+    void add_frame(int frame_idx) {
+        q.push_back(frame_idx);
     }
 
     Pager_FIFO() {};
-
     ~Pager_FIFO() {};
+};
+
+class Pager_Clock: public Pager
+{
+public:
+    deque<int> q;
+    int idx;
+
+    int select_victim_frame_index() {
+        if (q.empty()) {
+            return -1;
+        }
+        return idx;
+    }
+
+    void add_frame(int frame_idx) {
+
+    }
+
+    Pager_Clock() {idx = 0;};
+    ~Pager_Clock() {};
 };
 
 
@@ -287,7 +307,7 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
             }
 
             // update frame
-            frame_new->allocated = true;
+            frame_new->allocated = 1;
             frame_new->pid = proc_curr->pid;
             frame_new->vpage = vpage;
 
@@ -425,6 +445,8 @@ int main (int argc, char **argv) {
     case 'f':
         pager = new Pager_FIFO();
         break;
+    case 'c':
+        pager = new Pager_Clock();
     default:
         break;
     }
@@ -484,8 +506,7 @@ int main (int argc, char **argv) {
     }
     input.close();
 
-
-    frame_t frame_table[MAX_FRAMES]; 
+    frame_t *frame_table = new frame_t[MAX_FRAMES]();
     Stats *stats = new Stats();
     stats->proc_count = processList.size();
     stats->inst_count = instructionList.size();

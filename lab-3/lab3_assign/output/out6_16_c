@@ -1,0 +1,50 @@
+0: ==> c 0
+1: ==> r 2
+ ZERO
+ MAP 0
+2: ==> w 36
+ ZERO
+ MAP 1
+3: ==> r 43
+ ZERO
+ MAP 2
+4: ==> r 50
+ ZERO
+ MAP 3
+5: ==> r 23
+ ZERO
+ MAP 4
+6: ==> w 30
+ ZERO
+ MAP 5
+7: ==> w 12
+ ZERO
+ MAP 6
+8: ==> w 60
+ ZERO
+ MAP 7
+9: ==> w 37
+ ZERO
+ MAP 8
+10: ==> r 31
+ ZERO
+ MAP 9
+11: ==> w 62
+ ZERO
+ MAP 10
+12: ==> r 32
+ ZERO
+ MAP 11
+13: ==> r 39
+ ZERO
+ MAP 12
+14: ==> r 48
+ ZERO
+ MAP 13
+15: ==> r 42
+ ZERO
+ MAP 14
+16: ==> w 9
+ ZERO
+ MAP 15
+17: ==> w 38
