@@ -6,7 +6,7 @@ PROG=$3
 shift 3
 PARGS=${*:--oOPFS}
 
-INPUTS=`seq 1 8`
+INPUTS=`seq 1 10`
 ALGOS="f"
 FRAMES="16 32"
 
