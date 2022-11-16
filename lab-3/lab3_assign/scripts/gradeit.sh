@@ -11,7 +11,7 @@ DARGS=         # nothing
 DARGS="-q --speed-large-files"         # the big files are killing us --> out of memory / fork refused etc
 
 INPUTS=`seq 1 11`
-ALGOS=" f  r  c  e  a  w"
+ALGOS=" f"
 FRAMES="16 32"
 
 declare -ai counters
@@ -57,7 +57,7 @@ for I in ${INPUTS}; do
             OUTLINE=`printf "%s  ." "${OUTLINE}"`
             let counters[$x]=`expr ${counters[$x]} + 1`
         else
-            #echo "diff -b ${DARGS} ${DIR1}/${OUTF} ${DIR2}/${OUTF} failed" >> ${LOG}
+            echo "diff -b ${DARGS} ${DIR1}/${OUTF} ${DIR2}/${OUTF} failed" >> ${LOG}
             echo "${DIFFCMD} failed" >> ${LOG}
             SUMX=`egrep "^TOTAL" ${DIR1}/${OUTF}`
             SUMY=`egrep "^TOTAL" ${DIR2}/${OUTF}`

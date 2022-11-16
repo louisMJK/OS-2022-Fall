@@ -1,0 +1,73 @@
+gradeit.sh refout/ output/ output//LOG.txt
+diff -b -q --speed-large-files refout//out3_16_f output//out3_16_f failed
+cmp refout//out3_16_f output//out3_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 132990 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 110090 4
+diff -b -q --speed-large-files refout//out3_32_f output//out3_32_f failed
+cmp refout//out3_32_f output//out3_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 81130 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 65630 4
+diff -b -q --speed-large-files refout//out4_16_f output//out4_16_f failed
+cmp refout//out4_16_f output//out4_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 148630 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 124370 4
+diff -b -q --speed-large-files refout//out4_32_f output//out4_32_f failed
+cmp refout//out4_32_f output//out4_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 77450 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 67190 4
+diff -b -q --speed-large-files refout//out5_16_f output//out5_16_f failed
+cmp refout//out5_16_f output//out5_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 221430 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 117770 4
+diff -b -q --speed-large-files refout//out5_32_f output//out5_32_f failed
+cmp refout//out5_32_f output//out5_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 151470 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 63570 4
+diff -b -q --speed-large-files refout//out6_16_f output//out6_16_f failed
+cmp refout//out6_16_f output//out6_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 148870 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 130550 4
+diff -b -q --speed-large-files refout//out6_32_f output//out6_32_f failed
+cmp refout//out6_32_f output//out6_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 101 1 0 100150 4
+   DIR2-SUM ==> TOTALCOST 101 1 0 78030 4
+diff -b -q --speed-large-files refout//out7_16_f output//out7_16_f failed
+cmp refout//out7_16_f output//out7_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 213 13 0 311050 4
+   DIR2-SUM ==> TOTALCOST 213 13 0 234030 4
+diff -b -q --speed-large-files refout//out7_32_f output//out7_32_f failed
+cmp refout//out7_32_f output//out7_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 213 13 0 239710 4
+   DIR2-SUM ==> TOTALCOST 213 13 0 128590 4
+diff -b -q --speed-large-files refout//out8_16_f output//out8_16_f failed
+cmp refout//out8_16_f output//out8_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 210 10 0 367560 4
+   DIR2-SUM ==> TOTALCOST 210 10 0 272680 4
+diff -b -q --speed-large-files refout//out8_32_f output//out8_32_f failed
+cmp refout//out8_32_f output//out8_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 210 10 0 293100 4
+   DIR2-SUM ==> TOTALCOST 210 10 0 130300 4
+diff -b -q --speed-large-files refout//out9_16_f output//out9_16_f failed
+cmp refout//out9_16_f output//out9_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 1051 51 0 2778570 4
+   DIR2-SUM ==> TOTALCOST 1051 51 0 1910690 4
+diff -b -q --speed-large-files refout//out9_32_f output//out9_32_f failed
+cmp refout//out9_32_f output//out9_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 1051 51 0 2711430 4
+   DIR2-SUM ==> TOTALCOST 1051 51 0 1162270 4
+diff -b -q --speed-large-files refout//out10_16_f output//out10_16_f failed
+cmp refout//out10_16_f output//out10_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 5243 243 0 13236070 4
+   DIR2-SUM ==> TOTALCOST 5243 243 0 11203690 4
+diff -b -q --speed-large-files refout//out10_32_f output//out10_32_f failed
+cmp refout//out10_32_f output//out10_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 5243 243 0 13138530 4
+   DIR2-SUM ==> TOTALCOST 5243 243 0 6894470 4
+diff -b -q --speed-large-files refout//out11_16_f output//out11_16_f failed
+cmp refout//out11_16_f output//out11_16_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 5245 243 2 13599650 4
+   DIR2-SUM ==> TOTALCOST 5245 243 2 11130370 4
+diff -b -q --speed-large-files refout//out11_32_f output//out11_32_f failed
+cmp refout//out11_32_f output//out11_32_f 2>&1 failed
+   DIR1-SUM ==> TOTALCOST 5245 243 2 12817690 4
+   DIR2-SUM ==> TOTALCOST 5245 243 2 6805510 4

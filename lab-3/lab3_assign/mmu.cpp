@@ -13,6 +13,7 @@ using namespace std;
 
 
 const int MAX_VPAGES = 64;
+int MAX_FRAMES = 128;
 
 
 struct pte_t 
@@ -167,15 +168,14 @@ public:
 };
 
 
-void simulation (int num_frames, vector<Process *> process_list, vector<instruction> instr_list, Pager *pager, Stats *stats, PStat *pstats) {
-    frame_t frame_table[num_frames]; 
+void simulation (frame_t *frame_table, vector<Process *> process_list, vector<instruction> instr_list, Pager *pager, Stats *stats, PStat *pstats) {
     deque<int> free_frame_list;
     int pid;
     int vpage;
     Process *proc_curr;
     vector<VMA> VMAList;
 
-    for (int i = 0; i < num_frames; i++) {
+    for (int i = 0; i < MAX_FRAMES; i++) {
         free_frame_list.push_back(i);
         frame_table[i].allocated = false;
         frame_table[i].pid = -1;
@@ -281,7 +281,7 @@ void simulation (int num_frames, vector<Process *> process_list, vector<instruct
                 stats->cost += 140;
             }
 
-            cout << " Map " << pte->frame_index << endl;
+            cout << " MAP " << pte->frame_index << endl;
             pstats[proc_curr->pid].maps++;
             stats->cost += 300;
         }
@@ -309,7 +309,8 @@ void simulation (int num_frames, vector<Process *> process_list, vector<instruct
 }
 
 
-void print_stats(Stats *stats, PStat *pstats, vector<Process *> processList) {
+void print_stats(Stats *stats, PStat *pstats, frame_t *frame_table, vector<Process *> processList) {
+    // page tables
     for (int i = 0; i < stats->proc_count; i++) {
         Process *p = processList[i];
         pte_t *pt = p->pageTable;
@@ -344,6 +345,18 @@ void print_stats(Stats *stats, PStat *pstats, vector<Process *> processList) {
         }
     }
     cout << endl;
+    // frame table
+    cout << "FT:";
+    for (int i = 0; i < MAX_FRAMES; i++) {
+        if (frame_table[i].pid == -1) {
+            cout << " *";
+        }
+        else {
+            printf(" %d:%d", frame_table[i].pid, frame_table[i].vpage);
+        }
+    }
+    cout << endl;
+    // processes
     for (int i = 0; i < stats->proc_count; i++) {
         printf("PROC[%d]: U=%lu M=%lu I=%lu O=%lu FI=%lu FO=%lu Z=%lu SV=%lu SP=%lu\n",
                 i,
@@ -351,6 +364,7 @@ void print_stats(Stats *stats, PStat *pstats, vector<Process *> processList) {
                 pstats[i].fins, pstats[i].fouts, pstats[i].zeros,
                 pstats[i].segv, pstats[i].segprot);
     }
+    // summary
     printf("TOTALCOST %lu %lu %lu %llu %lu\n", 
             stats->inst_count, stats->ctx_switches, stats->process_exits, stats->cost, sizeof(pte_t));
 }
@@ -359,14 +373,13 @@ void print_stats(Stats *stats, PStat *pstats, vector<Process *> processList) {
 int main (int argc, char **argv) {
     // get arguments
     int c;
-    int num_frames = 128;
     string algo;
     string options;
     while ((c = getopt(argc, argv, "f:a:o:")) != -1) {
         switch (c)
         {
         case 'f':
-            num_frames = atoi(optarg);
+            MAX_FRAMES = atoi(optarg);
             break;
         case 'a':
             algo = optarg;
@@ -445,16 +458,17 @@ int main (int argc, char **argv) {
     input.close();
 
 
+    frame_t frame_table[MAX_FRAMES]; 
     Stats *stats = new Stats();
     stats->proc_count = processList.size();
     stats->inst_count = instructionList.size();
     PStat pstats[processList.size()];
 
     // simulation
-    simulation(num_frames, processList, instructionList, pager, stats, pstats);
+    simulation(frame_table, processList, instructionList, pager, stats, pstats);
 
     // print info
-    print_stats(stats, pstats, processList);
+    print_stats(stats, pstats, frame_table, processList);
 
     return 0;
 }
