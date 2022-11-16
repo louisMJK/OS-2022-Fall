@@ -238,12 +238,12 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
             }
             frame_t *frame_new = &frame_table[new_frame_idx];
 
-            // Pager, FIFO???
-            pager->add_frame(new_frame_idx);
-
-            // update PTE
+            // update PTE -> new frame
             pte->present = 1;
             pte->frame_index = new_frame_idx;
+
+            // Pager, FIFO???
+            pager->add_frame(new_frame_idx);
 
             // frame is mapped -> Unmap
             if (frame_new->allocated) {
@@ -262,10 +262,17 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
                     stats->cost += 2700;
                 }
 
+                // if (pte_prev->paged_out) {
+                //     cout << " IN" << endl;
+                //     pstats[proc_curr->pid].ins++;
+                //     stats->cost += 3100;
+                // }
+
                 // update old PTE
                 pte_prev->present = 0;
                 if (pte_prev->modified) {
                     pte_prev->paged_out = 1;
+                    pte_prev->modified = 0;
                 }
             }
 
@@ -274,6 +281,11 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
             frame_new->pid = proc_curr->pid;
             frame_new->vpage = vpage;
 
+            if (pte->paged_out) {
+                cout << " IN" << endl;
+                pstats[proc_curr->pid].ins++;
+                stats->cost += 3100;
+            }
 
             if (!pte->paged_out && !pte->file_mapped) {
                 cout << " ZERO" << endl;

@@ -10,9 +10,9 @@ USEDIFF=0
 DARGS=         # nothing
 DARGS="-q --speed-large-files"         # the big files are killing us --> out of memory / fork refused etc
 
-INPUTS=`seq 1 11`
+INPUTS=`seq 1 4`
 ALGOS=" f"
-FRAMES="16 32"
+FRAMES="16"
 
 declare -ai counters
 declare -i x=0
