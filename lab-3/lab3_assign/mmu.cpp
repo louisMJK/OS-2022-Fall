@@ -189,7 +189,7 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
 
         cout << i << ": ==> " << op << " " << val << endl;
 
-        // read or write instruction
+        // context switch
         if (op == 'c') {
             pid = val;
             proc_curr = process_list[pid];
@@ -197,6 +197,7 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
             stats->cost += 130;
             continue;
         }
+        // exit
         if (op == 'e') {
             stats->process_exits++;
             stats->cost += 1250;
@@ -259,18 +260,18 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
                 pte_t *pte_prev = &proc_prev->pageTable[vpage_prev];
 
                 printf(" UNMAP %d:%d\n", pid_prev, vpage_prev);
-                pstats[proc_curr->pid].unmaps++;
+                pstats[pid_prev].unmaps++;
                 stats->cost += 400;
 
                 if (pte_prev->modified) {
                     if (!pte_prev->file_mapped) {
                         cout << " OUT" << endl;
-                        pstats[proc_curr->pid].outs++;
+                        pstats[pid_prev].outs++;
                         stats->cost += 2700;
                     }
                     else {
                         cout << " FOUT" << endl;
-                        pstats[proc_curr->pid].fouts++;
+                        pstats[pid_prev].fouts++;
                         stats->cost += 2400;
                     }
                 }
@@ -369,8 +370,8 @@ void print_stats(Stats *stats, PStat *pstats, frame_t *frame_table, vector<Proce
                 cout << "-";
             }
         }
+        cout << endl;
     }
-    cout << endl;
     // frame table
     cout << "FT:";
     for (int i = 0; i < MAX_FRAMES; i++) {
@@ -456,7 +457,7 @@ int main (int argc, char **argv) {
         }
         else if (line.length() == 1) {
             vector<VMA> VMAList;
-            pte_t page_table[MAX_VPAGES] = {0};     // PTEs initialzed to 0
+            pte_t *page_table = new pte_t[MAX_VPAGES]();    // PTEs initialzed to 0 (default)
             int numVMA = stoi(line);
             
             int start_page;
