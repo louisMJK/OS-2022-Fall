@@ -42,6 +42,7 @@ struct frame_t
 
 frame_t *frame_table;
 
+
 struct instruction
 {
     char op;
@@ -85,14 +86,12 @@ public:
     };
 
     Process() {};
-
     ~Process() {};
 };
 
 vector<Process *> process_list;
 
 
-// deque, frames
 class Pager
 {
 public:
@@ -167,18 +166,18 @@ public:
 class Stats
 {
 public:
-    int proc_count;
     unsigned long inst_count;
     unsigned long ctx_switches;
     unsigned long process_exits;
     unsigned long long cost;
+
     Stats() {
-        proc_count = 0;
         inst_count = 0;
         ctx_switches = 0;
         process_exits = 0;
         cost = 0;
     };
+
     ~Stats() {};
 };
 
@@ -422,7 +421,7 @@ void print_stats(Stats *stats, PStat *pstats) {
     }
     cout << endl;
     // processes
-    for (int i = 0; i < stats->proc_count; i++) {
+    for (int i = 0; i < process_list.size(); i++) {
         printf("PROC[%d]: U=%lu M=%lu I=%lu O=%lu FI=%lu FO=%lu Z=%lu SV=%lu SP=%lu\n",
                 i,
                 pstats[i].unmaps, pstats[i].maps, pstats[i].ins, pstats[i].outs,
@@ -524,7 +523,6 @@ int main (int argc, char **argv) {
 
     frame_table = new frame_t[MAX_FRAMES]();
     Stats *stats = new Stats();
-    stats->proc_count = process_list.size();
     stats->inst_count = instructionList.size();
     PStat pstats[process_list.size()];
 
