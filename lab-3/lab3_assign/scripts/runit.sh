@@ -8,7 +8,7 @@ PARGS=${*:--oOPFS}
 
 INPUTS=`seq 1 10`
 ALGOS="f c"
-FRAMES="16"
+FRAMES="16 32"
 
 for I in ${INPUTS}; do
    for A in ${ALGOS}; do

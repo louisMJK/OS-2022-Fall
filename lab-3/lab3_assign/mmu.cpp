@@ -40,6 +40,8 @@ struct frame_t
 };
 
 
+frame_t *frame_table;
+
 struct instruction
 {
     char op;
@@ -87,6 +89,8 @@ public:
     ~Process() {};
 };
 
+vector<Process *> process_list;
+
 
 // deque, frames
 class Pager
@@ -130,11 +134,29 @@ public:
         if (q.empty()) {
             return -1;
         }
-        return idx;
+        frame_t *frame = &frame_table[q[idx]];
+        pte_t *pte = &process_list[frame->pid]->pageTable[frame->vpage];
+        while (pte->referenced) {
+            pte->referenced = 0;
+            idx = (idx + 1) % q.size();
+            frame = &frame_table[q[idx]];
+            pte = &process_list[frame->pid]->pageTable[frame->vpage];
+        }
+        int val = q[idx];
+        q.erase(q.begin() + idx);
+        idx = idx % q.size();
+        return val;
     }
 
     void add_frame(int frame_idx) {
-
+        if (q.empty()) {
+            q.push_back(frame_idx);
+        }
+        else {
+            int size = q.size();
+            q.insert(q.begin() + (idx % size), frame_idx);
+        }
+        idx = (idx + 1) % q.size();
     }
 
     Pager_Clock() {idx = 0;};
@@ -188,7 +210,7 @@ public:
 };
 
 
-void simulation (frame_t *frame_table, vector<Process *> process_list, vector<instruction> instr_list, Pager *pager, Stats *stats, PStat *pstats) {
+void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PStat *pstats) {
     deque<int> free_frame_list;
     int pid;
     int vpage;
@@ -258,16 +280,15 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
             }
             else {
                 new_frame_idx = pager->select_victim_frame_index();
-                // cout << " victim frame: " << new_frame_idx << endl;
             }
             frame_t *frame_new = &frame_table[new_frame_idx];
+
+            // add new frame to pager
+            pager->add_frame(new_frame_idx);
 
             // update PTE -> new frame
             pte->present = 1;
             pte->frame_index = new_frame_idx;
-
-            // Pager, FIFO???
-            pager->add_frame(new_frame_idx);
 
             // frame is mapped -> Unmap
             if (frame_new->allocated) {
@@ -354,10 +375,10 @@ void simulation (frame_t *frame_table, vector<Process *> process_list, vector<in
 }
 
 
-void print_stats(Stats *stats, PStat *pstats, frame_t *frame_table, vector<Process *> processList) {
+void print_stats(Stats *stats, PStat *pstats) {
     // page tables
-    for (int i = 0; i < stats->proc_count; i++) {
-        Process *p = processList[i];
+    for (int i = 0; i < process_list.size(); i++) {
+        Process *p = process_list[i];
         pte_t *pt = p->pageTable;
         printf("PT[%d]:", i);
         for (int j = 0; j < MAX_VPAGES; j++) {
@@ -392,7 +413,7 @@ void print_stats(Stats *stats, PStat *pstats, frame_t *frame_table, vector<Proce
     // frame table
     cout << "FT:";
     for (int i = 0; i < MAX_FRAMES; i++) {
-        if (frame_table[i].pid == -1) {
+        if (frame_table[i].allocated == 0) {
             cout << " *";
         }
         else {
@@ -448,7 +469,6 @@ int main (int argc, char **argv) {
         break;
     }
 
-
     // creat Processes(VMA, page_table) and Instructions
     string path_input = argv[optind];
     string path_rand = argv[optind + 1];
@@ -457,7 +477,6 @@ int main (int argc, char **argv) {
     int N;
     int index = 0;
     int pid = 0;
-    vector<Process *> processList;
     vector<instruction> instructionList;
 
     input.open(path_input);
@@ -489,7 +508,7 @@ int main (int argc, char **argv) {
                 VMAList.push_back(vma);
             }
             Process *proc = new Process(pid, VMAList, page_table);
-            processList.push_back(proc);
+            process_list.push_back(proc);
             pid++;
         }
         else {
@@ -503,17 +522,17 @@ int main (int argc, char **argv) {
     }
     input.close();
 
-    frame_t *frame_table = new frame_t[MAX_FRAMES]();
+    frame_table = new frame_t[MAX_FRAMES]();
     Stats *stats = new Stats();
-    stats->proc_count = processList.size();
+    stats->proc_count = process_list.size();
     stats->inst_count = instructionList.size();
-    PStat pstats[processList.size()];
+    PStat pstats[process_list.size()];
 
     // simulation
-    simulation(frame_table, processList, instructionList, pager, stats, pstats);
+    simulation(instructionList, pager, stats, pstats);
 
     // print info
-    print_stats(stats, pstats, frame_table, processList);
+    print_stats(stats, pstats);
 
     return 0;
 }
