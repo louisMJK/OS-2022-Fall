@@ -8,6 +8,8 @@
     "string": "cpp",
     "ostream": "cpp",
     "istream": "cpp",
-    "deque": "cpp"
+    "deque": "cpp",
+    "fstream": "cpp",
+    "new": "cpp"
   }
 }

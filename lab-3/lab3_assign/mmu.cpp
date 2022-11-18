@@ -162,6 +162,44 @@ public:
     ~Pager_Clock() {};
 };
 
+class Pager_Random: public Pager
+{
+public:
+    deque<int> q;
+    int idx;
+    int *randvals;
+
+    int select_victim_frame_index() {
+        int randIdx = randvals[idx] % q.size();
+        int frameIdx = q[randIdx];
+        idx++;
+        return frameIdx;
+    };
+
+    void add_frame(int frame_idx) {
+        if (q.size() < MAX_FRAMES) {
+            q.push_back(frame_idx);
+        }
+    };
+
+    Pager_Random(string path) {
+        idx = 0;
+        ifstream input;
+        input.open(path);
+        string line;
+        getline(input, line);
+        int size = stoi(line);
+        randvals = new int[size];
+        for (int i = 0; i < size; i++) {
+            getline(input, line);
+            randvals[i] = stoi(line);
+        }
+        input.close();
+    };
+
+    ~Pager_Random() {};
+};
+
 
 class Stats
 {
@@ -454,6 +492,8 @@ int main (int argc, char **argv) {
             break;
         }
     }
+    string path_input = argv[optind];
+    string path_rand = argv[optind + 1];
 
     // create Pager
     Pager *pager;
@@ -464,13 +504,15 @@ int main (int argc, char **argv) {
         break;
     case 'c':
         pager = new Pager_Clock();
+        break;
+    case 'r':
+        pager = new Pager_Random(path_rand);
+        break;
     default:
         break;
     }
 
     // creat Processes(VMA, page_table) and Instructions
-    string path_input = argv[optind];
-    string path_rand = argv[optind + 1];
     ifstream input;
     string line;
     int N;
