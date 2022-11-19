@@ -105,21 +105,24 @@ class Pager_FIFO: public Pager
 {
 public:
     deque<int> q;
+    int idx;
 
     int select_victim_frame_index() {
         if (q.empty()) {
             return -1;
         }
-        int idx = q.front();
-        q.pop_front();
-        return idx;
+        int frameIdx = q[idx];
+        idx = (idx + 1) % MAX_FRAMES;
+        return frameIdx;
     }
 
     void add_frame(int frame_idx) {
-        q.push_back(frame_idx);
+        if (q.size() < MAX_FRAMES) {
+            q.push_back(frame_idx);
+        }
     }
 
-    Pager_FIFO() {};
+    Pager_FIFO() {idx = 0;};
     ~Pager_FIFO() {};
 };
 
@@ -141,21 +144,15 @@ public:
             frame = &frame_table[q[idx]];
             pte = &process_list[frame->pid]->pageTable[frame->vpage];
         }
-        int val = q[idx];
-        q.erase(q.begin() + idx);
-        idx = idx % q.size();
-        return val;
+        int frameIdx = q[idx];
+        idx = (idx + 1) % q.size();
+        return frameIdx;
     }
 
     void add_frame(int frame_idx) {
-        if (q.empty()) {
+        if (q.size() < MAX_FRAMES) {
             q.push_back(frame_idx);
         }
-        else {
-            int size = q.size();
-            q.insert(q.begin() + (idx % size), frame_idx);
-        }
-        idx = (idx + 1) % q.size();
     }
 
     Pager_Clock() {idx = 0;};
@@ -170,6 +167,9 @@ public:
     int *randvals;
 
     int select_victim_frame_index() {
+        if (q.empty()) {
+            return -1;
+        }
         int randIdx = randvals[idx] % q.size();
         int frameIdx = q[randIdx];
         idx++;
@@ -198,6 +198,26 @@ public:
     };
 
     ~Pager_Random() {};
+};
+
+class Pager_ESC: public Pager
+{
+public:
+    deque<int> q;
+    int idx;
+
+    int select_victim_frame_index() {
+        if (q.empty()) {
+            return -1;
+        }
+    };
+
+    void add_frame(int frame_idx) {
+
+    };
+
+    Pager_ESC() {idx = 0;};
+    ~Pager_ESC() {};
 };
 
 
@@ -507,6 +527,9 @@ int main (int argc, char **argv) {
         break;
     case 'r':
         pager = new Pager_Random(path_rand);
+        break;
+    case 'e':
+        pager = new Pager_ESC();
         break;
     default:
         break;

@@ -6,9 +6,9 @@ PROG=$3
 shift 3
 PARGS=${*:--oOPFS}
 
-INPUTS=`seq 1 10`
-ALGOS="f c r"
-FRAMES="16 32"
+INPUTS=`seq 1 3`
+ALGOS="f c r e"
+FRAMES="16"
 
 for I in ${INPUTS}; do
    for A in ${ALGOS}; do
