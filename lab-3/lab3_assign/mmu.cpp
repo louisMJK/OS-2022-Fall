@@ -13,7 +13,7 @@ using namespace std;
 
 
 const int MAX_VPAGES = 64;
-int MAX_FRAMES = 128;
+const int MAX_FRAMES = 128;
 
 
 struct pte_t 
@@ -40,7 +40,7 @@ struct frame_t
 };
 
 
-frame_t *frame_table;
+frame_t *frame_table = new frame_t[MAX_FRAMES]();
 
 
 struct instruction
@@ -69,7 +69,6 @@ struct VMA
 };
 
 
-// Each process has a page_table (64 PTEs)
 class Process
 {
 public:
@@ -96,6 +95,7 @@ class Pager
 {
 public:
     char algo;
+    int FT_size;
     int instr_curr;
     int instr_prev;
     virtual int select_victim_frame_index() {return -1;};
@@ -115,17 +115,21 @@ public:
             return -1;
         }
         int frameIdx = q[idx];
-        idx = (idx + 1) % MAX_FRAMES;
+        idx = (idx + 1) % FT_size;
         return frameIdx;
-    }
+    };
 
     void add_frame(int frame_idx) {
-        if (q.size() < MAX_FRAMES) {
+        if (q.size() < FT_size) {
             q.push_back(frame_idx);
         }
-    }
+    };
 
-    Pager_FIFO() {idx = 0;};
+    Pager_FIFO(int num_frames) {
+        idx = 0;
+        FT_size = num_frames;
+    };
+
     ~Pager_FIFO() {};
 };
 
@@ -153,12 +157,16 @@ public:
     }
 
     void add_frame(int frame_idx) {
-        if (q.size() < MAX_FRAMES) {
+        if (q.size() < FT_size) {
             q.push_back(frame_idx);
         }
     }
 
-    Pager_Clock() {idx = 0;};
+    Pager_Clock(int num_frames) {
+        idx = 0;
+        FT_size = num_frames;
+    };
+
     ~Pager_Clock() {};
 };
 
@@ -180,13 +188,14 @@ public:
     };
 
     void add_frame(int frame_idx) {
-        if (q.size() < MAX_FRAMES) {
+        if (q.size() < FT_size) {
             q.push_back(frame_idx);
         }
     };
 
-    Pager_Random(string path) {
+    Pager_Random(int num_frames, string path) {
         idx = 0;
+        FT_size = num_frames;
         ifstream input;
         string line;
         input.open(path);
@@ -223,7 +232,6 @@ public:
         for (int i = 0; i < q.size(); i++) {
             frame = &frame_table[q[idx]];
             pte = &process_list[frame->pid]->pageTable[frame->vpage];
-
             int class_index = 2 * pte->referenced + pte->modified;
             if (frame_class[class_index] == -1) {
                 frame_class[class_index] = idx;
@@ -232,7 +240,6 @@ public:
                 pte->referenced = 0;
                 instr_prev = instr_curr;
             }
-
             idx = (idx + 1) % q.size();
         }
         for (int i = 0; i < 4; i++) {
@@ -246,13 +253,14 @@ public:
     };
 
     void add_frame(int frame_idx) {
-        if (q.size() < MAX_FRAMES) {
+        if (q.size() < FT_size) {
             q.push_back(frame_idx);
         }
     };
 
-    Pager_ESC() {
+    Pager_ESC(int num_frames) {
         idx = 0;
+        FT_size = num_frames;
         instr_curr = 0;
         instr_prev = -1;
     };
@@ -260,6 +268,32 @@ public:
     ~Pager_ESC() {};
 };
 
+class Pager_Aging: public Pager
+{
+public:
+    deque<int> q;
+    int idx;
+
+    int select_victim_frame_index() {
+        if (q.empty()) {
+            return -1;
+        }
+
+    };
+
+    void add_frame(int frame_idx) {
+        if (q.size() < FT_size) {
+            q.push_back(frame_idx);
+        }
+    };
+
+    Pager_Aging(int num_frames) {
+        idx = 0;
+        FT_size = num_frames;
+    };
+
+    ~Pager_Aging() {};
+};
 
 class Stats
 {
@@ -268,6 +302,7 @@ public:
     unsigned long ctx_switches;
     unsigned long process_exits;
     unsigned long long cost;
+    int num_frames;
 
     Stats() {
         inst_count = 0;
@@ -314,7 +349,7 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
     Process *proc_curr;
     vector<VMA> VMAList;
 
-    for (int i = 0; i < MAX_FRAMES; i++) {
+    for (int i = 0; i < pager->FT_size; i++) {
         free_frame_list.push_back(i);
     }
 
@@ -516,7 +551,7 @@ void print_stats(Stats *stats, PStat *pstats) {
     }
     // frame table
     cout << "FT:";
-    for (int i = 0; i < MAX_FRAMES; i++) {
+    for (int i = 0; i < stats->num_frames; i++) {
         if (frame_table[i].allocated == 0) {
             cout << " *";
         }
@@ -542,13 +577,14 @@ void print_stats(Stats *stats, PStat *pstats) {
 int main (int argc, char **argv) {
     // get arguments
     int c;
+    int num_frames;
     string algo;
     string options;
     while ((c = getopt(argc, argv, "f:a:o:")) != -1) {
         switch (c)
         {
         case 'f':
-            MAX_FRAMES = atoi(optarg);
+            num_frames = atoi(optarg);
             break;
         case 'a':
             algo = optarg;
@@ -567,20 +603,24 @@ int main (int argc, char **argv) {
     switch (algo[0])
     {
     case 'f':
-        pager = new Pager_FIFO();
+        pager = new Pager_FIFO(num_frames);
         pager->algo = 'f';
         break;
     case 'c':
-        pager = new Pager_Clock();
+        pager = new Pager_Clock(num_frames);
         pager->algo = 'c';
         break;
     case 'r':
-        pager = new Pager_Random(path_rand);
+        pager = new Pager_Random(num_frames, path_rand);
         pager->algo = 'r';
         break;
     case 'e':
-        pager = new Pager_ESC();
+        pager = new Pager_ESC(num_frames);
         pager->algo = 'e';
+        break;
+    case 'a':
+        pager = new Pager_Aging(num_frames);
+        pager->algo = 'a';
         break;
     default:
         break;
@@ -637,9 +677,9 @@ int main (int argc, char **argv) {
     }
     input.close();
 
-    frame_table = new frame_t[MAX_FRAMES]();
     Stats *stats = new Stats();
     stats->inst_count = instructionList.size();
+    stats->num_frames = num_frames;
     PStat pstats[process_list.size()];
 
     // simulation
