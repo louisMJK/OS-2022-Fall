@@ -95,8 +95,11 @@ vector<Process *> process_list;
 class Pager
 {
 public:
+    char algo;
+    int instr_curr;
+    int instr_prev;
     virtual int select_victim_frame_index() {return -1;};
-    virtual void add_frame(int idx) {};
+    virtual void add_frame(int frame_idx) {};
     Pager() {};
     ~Pager() {};
 };
@@ -185,8 +188,8 @@ public:
     Pager_Random(string path) {
         idx = 0;
         ifstream input;
-        input.open(path);
         string line;
+        input.open(path);
         getline(input, line);
         int size = stoi(line);
         randvals = new int[size];
@@ -200,6 +203,9 @@ public:
     ~Pager_Random() {};
 };
 
+
+bool ESC_reset = false;
+
 class Pager_ESC: public Pager
 {
 public:
@@ -210,13 +216,47 @@ public:
         if (q.empty()) {
             return -1;
         }
+        int frame_class[4] = {-1, -1, -1, -1};
+        int victimIdx;
+        frame_t *frame;
+        pte_t *pte;
+        for (int i = 0; i < q.size(); i++) {
+            frame = &frame_table[q[idx]];
+            pte = &process_list[frame->pid]->pageTable[frame->vpage];
+
+            int class_index = 2 * pte->referenced + pte->modified;
+            if (frame_class[class_index] == -1) {
+                frame_class[class_index] = idx;
+            }
+            if (ESC_reset) {
+                pte->referenced = 0;
+                instr_prev = instr_curr;
+            }
+
+            idx = (idx + 1) % q.size();
+        }
+        for (int i = 0; i < 4; i++) {
+            if (frame_class[i] != -1) {
+                victimIdx = q[frame_class[i]];
+                idx = (victimIdx + 1) % q.size();
+                break;
+            }
+        }
+        return victimIdx;
     };
 
     void add_frame(int frame_idx) {
-
+        if (q.size() < MAX_FRAMES) {
+            q.push_back(frame_idx);
+        }
     };
 
-    Pager_ESC() {idx = 0;};
+    Pager_ESC() {
+        idx = 0;
+        instr_curr = 0;
+        instr_prev = -1;
+    };
+
     ~Pager_ESC() {};
 };
 
@@ -304,6 +344,11 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
         vpage = val;
         pte_t *pte = &proc_curr->pageTable[vpage];
 
+        if (pager->algo == 'e') {
+            ESC_reset = (i - pager->instr_prev >= 50) ? true : false;
+            pager->instr_curr = i;
+        }
+
         // page fault exception
         if (!pte->present) {
             // verify this is actually a valid page in a vma, if not raise error and next inst
@@ -379,6 +424,9 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
                         pte_prev->paged_out = 1;
                     }
                 }
+                pte_prev->referenced = 0;
+                pte_prev->file_mapped = 0;
+                pte_prev->write_protect = 0;
             }
 
             // update frame
@@ -410,7 +458,6 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
         }
 
         // now the page is definitely present
-        // check write protection
         // simulate instruction execution by hardware by updating the R/M PTE bits
         if (op == 'w') {
             if (pte->write_protect) {
@@ -521,15 +568,19 @@ int main (int argc, char **argv) {
     {
     case 'f':
         pager = new Pager_FIFO();
+        pager->algo = 'f';
         break;
     case 'c':
         pager = new Pager_Clock();
+        pager->algo = 'c';
         break;
     case 'r':
         pager = new Pager_Random(path_rand);
+        pager->algo = 'r';
         break;
     case 'e':
         pager = new Pager_ESC();
+        pager->algo = 'e';
         break;
     default:
         break;

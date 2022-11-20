@@ -1,13 +1,1 @@
 gradeit.sh refout/ output/ output//LOG.txt
-diff -b -q --speed-large-files refout//out1_16_e output//out1_16_e failed
-cmp refout//out1_16_e output//out1_16_e 2>&1 failed
-   DIR1-SUM ==> TOTALCOST 31 1 0 15600 4
-   DIR2-SUM ==> TOTALCOST 31 1 0 14640 4
-diff -b -q --speed-large-files refout//out2_16_e output//out2_16_e failed
-cmp refout//out2_16_e output//out2_16_e 2>&1 failed
-   DIR1-SUM ==> TOTALCOST 31 1 0 16620 4
-   DIR2-SUM ==> TOTALCOST 31 1 0 10760 4
-diff -b -q --speed-large-files refout//out3_16_e output//out3_16_e failed
-cmp refout//out3_16_e output//out3_16_e 2>&1 failed
-   DIR1-SUM ==> TOTALCOST 101 1 0 86550 4
-   DIR2-SUM ==> 
