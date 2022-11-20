@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <deque>
+#include <queue>
 
 
 using namespace std;
@@ -18,25 +19,22 @@ const int MAX_FRAMES = 128;
 
 struct pte_t 
 {
-    // initialized to 0
     unsigned int present:1;
     unsigned int referenced:1;
     unsigned int modified:1;
     unsigned int write_protect:1;
     unsigned int paged_out:1;
     unsigned int frame_index:7;
-
     unsigned int file_mapped:1;
-    // valid addresses?
 };
 
 
 struct frame_t 
 {
-    // frame -> PTE
     int allocated;
     int pid;
     int vpage;
+    unsigned int age:32;
 };
 
 
@@ -114,9 +112,9 @@ public:
         if (q.empty()) {
             return -1;
         }
-        int frameIdx = q[idx];
+        int victimIdx = q[idx];
         idx = (idx + 1) % FT_size;
-        return frameIdx;
+        return victimIdx;
     };
 
     void add_frame(int frame_idx) {
@@ -151,9 +149,9 @@ public:
             frame = &frame_table[q[idx]];
             pte = &process_list[frame->pid]->pageTable[frame->vpage];
         }
-        int frameIdx = q[idx];
+        int victimIdx = q[idx];
         idx = (idx + 1) % q.size();
-        return frameIdx;
+        return victimIdx;
     }
 
     void add_frame(int frame_idx) {
@@ -182,9 +180,8 @@ public:
             return -1;
         }
         int randIdx = randvals[idx] % q.size();
-        int frameIdx = q[randIdx];
         idx++;
-        return frameIdx;
+        return q[randIdx];
     };
 
     void add_frame(int frame_idx) {
@@ -238,7 +235,6 @@ public:
             }
             if (ESC_reset) {
                 pte->referenced = 0;
-                instr_prev = instr_curr;
             }
             idx = (idx + 1) % q.size();
         }
@@ -248,6 +244,9 @@ public:
                 idx = (victimIdx + 1) % q.size();
                 break;
             }
+        }
+        if (ESC_reset) {
+            instr_prev = instr_curr;
         }
         return victimIdx;
     };
@@ -275,10 +274,26 @@ public:
     int idx;
 
     int select_victim_frame_index() {
-        if (q.empty()) {
-            return -1;
+        int victimIdx;
+        unsigned long minAge = ULONG_MAX;
+        frame_t *frame;
+        pte_t *pte;
+        for (int i = 0; i < FT_size; i++) {
+            frame = &frame_table[q[idx]];
+            pte = &process_list[frame->pid]->pageTable[frame->vpage];
+            frame->age = frame->age >> 1;
+            if (pte->referenced) {
+                frame->age = (frame->age | 0x80000000);
+            }
+            pte->referenced = 0;
+            if (frame->age < minAge) {
+                minAge = frame->age;
+                victimIdx = q[idx];
+            }
+            idx = (idx + 1) % FT_size;
         }
-
+        idx = (victimIdx + 1) % FT_size;
+        return victimIdx;
     };
 
     void add_frame(int frame_idx) {
@@ -294,6 +309,15 @@ public:
 
     ~Pager_Aging() {};
 };
+
+
+class Pager_WorkingSet: public Pager
+{
+public:
+    Pager_WorkingSet(/* args */);
+    ~Pager_WorkingSet();
+};
+
 
 class Stats
 {
@@ -490,6 +514,9 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
             cout << " MAP " << pte->frame_index << endl;
             pstats[proc_curr->pid].maps++;
             stats->cost += 300;
+            if (pager->algo == 'a') {
+                frame_table[pte->frame_index].age = 0;
+            }
         }
 
         // now the page is definitely present

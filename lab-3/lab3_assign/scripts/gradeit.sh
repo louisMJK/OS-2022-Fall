@@ -12,7 +12,7 @@ DARGS="-q --speed-large-files"         # the big files are killing us --> out of
 
 INPUTS=`seq 1 10`
 ALGOS="f c r e a"
-FRAMES="16"
+FRAMES="16 32"
 
 declare -ai counters
 declare -i x=0
