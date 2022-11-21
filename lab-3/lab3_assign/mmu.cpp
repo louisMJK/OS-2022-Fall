@@ -35,6 +35,7 @@ struct frame_t
     int pid;
     int vpage;
     unsigned int age:32;
+    int time_last_use;
 };
 
 
@@ -274,6 +275,9 @@ public:
     int idx;
 
     int select_victim_frame_index() {
+        if (q.empty()) {
+            return -1;
+        }
         int victimIdx;
         unsigned long minAge = ULONG_MAX;
         frame_t *frame;
@@ -310,38 +314,70 @@ public:
     ~Pager_Aging() {};
 };
 
-
 class Pager_WorkingSet: public Pager
 {
 public:
-    Pager_WorkingSet(/* args */);
-    ~Pager_WorkingSet();
+    deque<int> q;
+    int idx;
+
+    int select_victim_frame_index() {
+        if (q.empty()) {
+            return -1;
+        }
+        int vicitimIdx = idx;
+        int time_min = instr_curr + 1;
+        frame_t *frame;
+        pte_t *pte;
+        for (int i = 0; i < FT_size; i++) {
+            frame = &frame_table[q[idx]];
+            pte = &process_list[frame->pid]->pageTable[frame->vpage];
+            if (pte->referenced) {
+                frame->time_last_use = instr_curr;
+                pte->referenced = 0;
+            }
+            else {
+                int age = instr_curr - frame->time_last_use;
+                if (age >= 50) {
+                    vicitimIdx = q[idx];
+                    break;
+                }
+                else if (frame->time_last_use < time_min) {
+                    time_min = frame->time_last_use;
+                    vicitimIdx = q[idx];
+                }
+            }
+            idx = (idx + 1) % FT_size;
+        }
+        idx = (vicitimIdx + 1) % FT_size;
+        return vicitimIdx;
+    };
+
+    void add_frame(int frame_idx) {
+        if (q.size() < FT_size) {
+            q.push_back(frame_idx);
+        }
+    };
+
+    Pager_WorkingSet(int num_frames) {
+        idx = 0;
+        FT_size = num_frames;
+    };
+
+    ~Pager_WorkingSet() {};
 };
 
 
-class Stats
+struct Stats
 {
-public:
     unsigned long inst_count;
     unsigned long ctx_switches;
     unsigned long process_exits;
     unsigned long long cost;
     int num_frames;
-
-    Stats() {
-        inst_count = 0;
-        ctx_switches = 0;
-        process_exits = 0;
-        cost = 0;
-    };
-
-    ~Stats() {};
 };
 
-
-class PStat
+struct PStat
 {
-public:
     unsigned long unmaps;
     unsigned long maps;
     unsigned long ins;
@@ -351,22 +387,13 @@ public:
     unsigned long zeros;
     unsigned long segv;
     unsigned long segprot;
-    PStat() {
-        unmaps = 0;
-        maps = 0;
-        ins = 0;
-        outs = 0;
-        fins = 0;
-        fouts = 0;
-        zeros = 0;
-        segv = 0;
-        segprot = 0;
-    };
-    ~PStat() {};
 };
 
+Stats *stats = new Stats();
+PStat *pstats;
 
-void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PStat *pstats) {
+
+void simulation (vector<instruction> instr_list, Pager *pager) {
     deque<int> free_frame_list;
     int pid;
     int vpage;
@@ -405,8 +432,8 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
 
         if (pager->algo == 'e') {
             ESC_reset = (i - pager->instr_prev >= 50) ? true : false;
-            pager->instr_curr = i;
         }
+        pager->instr_curr = i;
 
         // page fault exception
         if (!pte->present) {
@@ -438,14 +465,12 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
             if (!free_frame_list.empty()) {
                 new_frame_idx = free_frame_list[0];
                 free_frame_list.pop_front();
+                pager->add_frame(new_frame_idx);    // add new frame to pager
             }
             else {
                 new_frame_idx = pager->select_victim_frame_index();
             }
             frame_t *frame_new = &frame_table[new_frame_idx];
-
-            // add new frame to pager
-            pager->add_frame(new_frame_idx);
 
             // update PTE -> new frame
             pte->present = 1;
@@ -492,6 +517,11 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
             frame_new->allocated = 1;
             frame_new->pid = proc_curr->pid;
             frame_new->vpage = vpage;
+            frame_new->time_last_use = i;
+            // reset age for the Aging algo
+            if (pager->algo == 'a') {
+                frame_new->age = 0;
+            }
 
             if (pte->paged_out && !pte->file_mapped) {
                 cout << " IN" << endl;
@@ -514,22 +544,18 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
             cout << " MAP " << pte->frame_index << endl;
             pstats[proc_curr->pid].maps++;
             stats->cost += 300;
-            if (pager->algo == 'a') {
-                frame_table[pte->frame_index].age = 0;
-            }
         }
 
         // now the page is definitely present
         // simulate instruction execution by hardware by updating the R/M PTE bits
         if (op == 'w') {
+            pte->referenced = 1;
             if (pte->write_protect) {
                 cout << " SEGPROT" << endl;
-                pte->referenced = 1;
                 pstats[proc_curr->pid].segprot++;
                 stats->cost += 420;
             }
             else {
-                pte->referenced = 1;
                 pte->modified = 1;
             }
         }
@@ -541,7 +567,7 @@ void simulation (vector<instruction> instr_list, Pager *pager, Stats *stats, PSt
 }
 
 
-void print_stats(Stats *stats, PStat *pstats) {
+void print_stats() {
     // page tables
     for (int i = 0; i < process_list.size(); i++) {
         Process *p = process_list[i];
@@ -649,6 +675,10 @@ int main (int argc, char **argv) {
         pager = new Pager_Aging(num_frames);
         pager->algo = 'a';
         break;
+    case 'w':
+        pager = new Pager_WorkingSet(num_frames);
+        pager->algo = 'w';
+        break;
     default:
         break;
     }
@@ -704,16 +734,16 @@ int main (int argc, char **argv) {
     }
     input.close();
 
-    Stats *stats = new Stats();
     stats->inst_count = instructionList.size();
     stats->num_frames = num_frames;
-    PStat pstats[process_list.size()];
+    // PStat pstats[process_list.size()];
+    pstats = new PStat[process_list.size()]();
 
     // simulation
-    simulation(instructionList, pager, stats, pstats);
+    simulation(instructionList, pager);
 
     // print info
-    print_stats(stats, pstats);
+    print_stats();
 
     return 0;
 }
