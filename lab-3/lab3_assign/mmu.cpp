@@ -7,7 +7,6 @@
 #include <vector>
 #include <string>
 #include <deque>
-#include <queue>
 
 
 using namespace std;
@@ -421,12 +420,40 @@ void simulation (vector<instruction> instr_list, Pager *pager) {
         }
         // exit
         if (op == 'e') {
+            pid = proc_curr->pid;
+            cout << "EXIT current process " << pid << endl;
             stats->process_exits++;
             stats->cost += 1250;
+            // page table of current process
+            pte_t *page_table = proc_curr->pageTable;
+            for (int page = 0; page < MAX_VPAGES; page++) {
+                pte_t *pte = &page_table[page];
+                pte->paged_out = 0;
+                if (!pte->present) {
+                    continue;
+                }
+                // Unmap PTE
+                pte->present = 0;
+                printf(" UNMAP %d:%d\n", pid, page);
+                pstats[pid].unmaps++;
+                stats->cost += 400;
+                // FOUT
+                if (pte->modified && pte->file_mapped) {
+                    cout << " FOUT" << endl;
+                    pstats[pid].fouts++;
+                    stats->cost += 2400;
+                }
+                // return frame to free_frame_list
+                int frameIdx = pte->frame_index;
+                frame_t *frame = &frame_table[frameIdx];
+                frame->allocated = 0;
+                free_frame_list.push_back(frameIdx);
+            }
             continue;
         }
-        stats->cost += 1;
 
+        // read / write
+        stats->cost += 1;
         vpage = val;
         pte_t *pte = &proc_curr->pageTable[vpage];
 
