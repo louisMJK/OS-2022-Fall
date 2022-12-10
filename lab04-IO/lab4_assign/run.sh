@@ -1,4 +1,4 @@
 make
 ./runit.sh outputs/ ./iosched
-# ./gradeit.sh refout/ output/
+./gradeit.sh refout/ outputs/
 
