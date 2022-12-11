@@ -235,6 +235,51 @@ public:
     Scheduler_LOOK() {};
 };
 
+class Scheduler_CLOOK: public Scheduler
+{
+public:
+    deque<request *> q;
+
+    void add_request(request *req) {
+        if (q.empty()) {
+            q.push_back(req);
+        }
+        else {
+            deque<request *>::iterator it = q.begin();
+            while (it != q.end() && (*it)->track <= req->track) {
+                it++;
+            }
+            q.insert(it, req);
+        }
+    }
+
+    request* get_request() {
+        if (q.empty()) {
+            return nullptr;
+        }
+        request *req;
+        if (head <= q.back()->track) {
+            deque<request *>::iterator it = q.begin();
+            while (it != q.end() && (*it)->track < head) {
+                it++;
+            }
+            req = *it;
+            q.erase(it);
+        }
+        else {
+            req = q.front();
+            q.pop_front();
+        }
+        return req;
+    }
+
+    bool empty() {
+        return q.empty();
+    }
+
+    Scheduler_CLOOK() {};
+};
+
 
 void simulation(Scheduler *sched) {
     int reqIdx = 0;
@@ -328,6 +373,9 @@ int main(int argc, char **argv) {
         break;
     case 's':
         scheduler = new Scheduler_LOOK();
+        break;
+    case 'c':
+        scheduler = new Scheduler_CLOOK();
         break;
     default:
         break;
