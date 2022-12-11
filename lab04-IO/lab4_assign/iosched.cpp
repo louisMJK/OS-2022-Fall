@@ -280,6 +280,83 @@ public:
     Scheduler_CLOOK() {};
 };
 
+class Scheduler_FLOOK: public Scheduler
+{
+public:
+    deque<request *> addQ;
+    deque<request *> activeQ;
+
+    void add_request(request *req) {
+        if (addQ.empty()) {
+            addQ.push_back(req);
+        }
+        else {
+            deque<request *>::iterator it = addQ.begin();
+            while (it != addQ.end() && (*it)->track <= req->track) {
+                it++;
+            }
+            addQ.insert(it, req);
+        }
+    }
+
+    request* get_request() {
+        if (!activeQ.empty()) {
+            // LOOK in activeQ
+            request *req;
+            deque<request *>::iterator it = activeQ.begin();
+            while (it != activeQ.end() && (*it)->track < head) {
+                it++;
+            }
+            if (it != activeQ.end() && (*it)->track == head) {
+                req = *it;
+                activeQ.erase(it);
+                return req;
+            }
+            if (dir == 1) {
+                if (head <= activeQ.back()->track) {
+                    req = *it;
+                }
+                else {
+                    dir = -1;
+                    it = activeQ.end() - 1;
+                    while (it != activeQ.begin() && (*it)->track == (*(it - 1))->track) {
+                        it--;
+                    }
+                    req = *it;
+                }
+            }
+            else if (dir == -1) {
+                if (head >= activeQ.front()->track) {
+                    it--;
+                    while (it != activeQ.begin() && (*it)->track == (*(it - 1))->track) {
+                        it--;
+                    }
+                    req = *it;
+                }
+                else {
+                    dir = 1;
+                    it = activeQ.begin();
+                    req = *it;
+                }
+            }
+            activeQ.erase(it);
+            return req;  
+        }
+        else {
+            // swap queue
+            activeQ.swap(addQ);
+            return get_request();
+        }
+        return nullptr;
+    }
+
+    bool empty() {
+        return (addQ.empty() && activeQ.empty());
+    }
+
+    Scheduler_FLOOK() {};
+};
+
 
 void simulation(Scheduler *sched) {
     int reqIdx = 0;
@@ -294,16 +371,13 @@ void simulation(Scheduler *sched) {
             sched->add_request(req_new);
             reqIdx++;
             req_new = reqList[reqIdx];
-            // cout << "T:" << time_curr << " Added:" << reqIdx - 1 << endl;
         }
 
         // if an IO is active and completed at this time
         if (active && head == req_curr->track) {
             req_curr->end_time = time_curr;
             stat->total_turnaround += time_curr - req_curr->arrival_time;
-
             // printf("%5d: %5d %5d %5d, head = %d\n", time_curr, req_curr->arrival_time, req_curr->start_time, req_curr->end_time, head);
-
             numOps++;
             active = false;
             req_curr = nullptr;
@@ -376,6 +450,9 @@ int main(int argc, char **argv) {
         break;
     case 'c':
         scheduler = new Scheduler_CLOOK();
+        break;
+    case 'f':
+        scheduler = new Scheduler_FLOOK();
         break;
     default:
         break;

@@ -13,8 +13,7 @@ INS="`seq 0 9`"
 INPRE="inputs/input"
 OUTPRE="out"
 
-# ALGOS="i j s c f"
-ALGOS="i j s c"
+ALGOS="i j s c f"
 
 declare -ai counters
 declare -i x=0

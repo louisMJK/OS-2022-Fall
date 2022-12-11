@@ -14,8 +14,7 @@ INS="`seq 0 9`"
 INPRE="input"
 OUTPRE="out"
 
-# SCHEDS="i j s c f"
-SCHEDS="i j s c"
+SCHEDS="i j s c f"
 
 
 ############################################################################
