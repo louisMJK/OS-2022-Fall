@@ -14,7 +14,7 @@ INPRE="inputs/input"
 OUTPRE="out"
 
 # ALGOS="i j s c f"
-ALGOS="i"
+ALGOS="i j"
 
 declare -ai counters
 declare -i x=0

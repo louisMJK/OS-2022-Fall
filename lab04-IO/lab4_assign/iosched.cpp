@@ -31,13 +31,17 @@ struct stats
 {
     int total_time;
     int total_movement;
-    float total_turnaround;
-    float total_waittime;
+    double total_turnaround;
+    double total_waittime;
     int max_waittime;
-    float avg_turnaround;
-    float avg_waittime;
+    double avg_turnaround;
+    double avg_waittime;
 };
 stats *stat = new stats();
+
+
+int time_curr = 0;
+int head = 0;
 
 
 class Scheduler
@@ -75,12 +79,98 @@ public:
     Scheduler_FIFO() {};
 };
 
+class Scheduler_SSTF: public Scheduler
+{
+public:
+    deque<request *> q;
+
+    void add_request(request *req) {
+        if (q.empty()) {
+            q.push_back(req);
+        }
+        else {
+            deque<request *>::iterator it = q.begin();
+            while (it != q.end() && (*it)->track <= req->track) {
+                it++;
+            }
+            q.insert(it, req);
+        }
+    }
+
+    request* get_request() {
+        if (q.empty()) {
+            return  nullptr;
+        }
+        request *req;
+        deque<request *>::iterator it = q.begin();
+        while (it != q.end() && (*it)->track < head) {
+            // cout << (*it)->track << " ";
+            it++;
+        }
+        // cout << endl;
+
+        if (it == q.begin()) {
+            req = *it;
+        }
+        else if (it == q.end()) {
+            it--;
+            int track_next = (*it)->track;
+            while (it != q.begin() && (*it)->track == track_next) {
+                it--;
+            }
+            if (it != q.begin() || (*it)->track != track_next) {
+                it++;
+            }
+            req = *it;
+        }
+        else {
+            int leftDist = head - (*(it - 1))->track;
+            int rightDist = (*it)->track - head;
+            if (leftDist > rightDist) {
+                req = *it;
+            }
+            else if (leftDist < rightDist) {
+                it--;
+                int track_next = (*it)->track;
+                while (it != q.begin() && (*it)->track == track_next) {
+                    it--;
+                }
+                if (it != q.begin() || (*it)->track != track_next) {
+                    it++;
+                }
+                req = *it;
+            }
+            else {
+                deque<request *>::iterator it_left = it - 1;
+                int track_left = (*it_left)->track;
+                while (it_left != q.begin() && (*it_left)->track == track_left) {
+                    it_left--;
+                }
+                if (it_left != q.begin() || (*it_left)->track != track_left) {
+                    it_left++;
+                }
+                if ((*it_left)->arrival_time < (*it)->arrival_time) {
+                    it = it_left;
+                }
+                req = *it;
+            }
+        }
+        q.erase(it);
+        return req;
+    }
+
+    bool empty() {
+        return q.empty();
+    }
+
+    Scheduler_SSTF() {};
+};
+
+
 
 void simulation(Scheduler *sched) {
-    int time_curr = 0;
     int reqIdx = 0;
     int numOps = 0;
-    int head = 0;
     int dir = 1;
     bool active = false;
     request *req_curr = nullptr;
@@ -90,15 +180,18 @@ void simulation(Scheduler *sched) {
         // if a new I/O arrived at the system at this current time
         if (reqIdx < reqList.size() && time_curr == req_new->arrival_time) {
             sched->add_request(req_new);
-            req_new = reqList[++reqIdx];
-            // cout << "T" << time_curr << " Added:" << reqIdx - 1 << endl;
+            reqIdx++;
+            req_new = reqList[reqIdx];
+            // cout << "T:" << time_curr << " Added:" << reqIdx - 1 << endl;
         }
 
         // if an IO is active and completed at this time
         if (active && head == req_curr->track) {
             req_curr->end_time = time_curr;
             stat->total_turnaround += time_curr - req_curr->arrival_time;
-            printf("%5d: %5d %5d %5d\n", numOps, req_curr->arrival_time, req_curr->start_time, req_curr->end_time);
+
+            // printf("%5d: %5d %5d %5d, head = %d\n", time_curr, req_curr->arrival_time, req_curr->start_time, req_curr->end_time, head);
+
             numOps++;
             active = false;
             req_curr = nullptr;
@@ -111,10 +204,15 @@ void simulation(Scheduler *sched) {
                 req_curr = sched->get_request();
                 active = true;
                 req_curr->start_time = time_curr;
-                dir = (req_curr->track > head) ? 1 : -1;
                 int waittime = time_curr - req_curr->arrival_time;
                 stat->total_waittime += waittime;
                 stat->max_waittime = max(stat->max_waittime, waittime);
+                if (req_curr->track == head) {
+                    continue;
+                }
+                else {
+                    dir = (req_curr->track > head) ? 1 : -1;
+                }
             }
             else if (numOps == reqList.size()) {
                 stat->total_time = time_curr;
@@ -151,12 +249,15 @@ int main(int argc, char **argv) {
         }
     }
 
-    // create Pager
+    // create scheduler
     Scheduler *scheduler;
     switch (algo[0])
     {
     case 'i':
         scheduler = new Scheduler_FIFO();
+        break;
+    case 'j':
+        scheduler = new Scheduler_SSTF();
         break;
     default:
         break;
@@ -181,7 +282,6 @@ int main(int argc, char **argv) {
         timeIdx = stoi(line.substr(0, pos));
         trackIdx = stoi(line.substr(pos + 1));
         request *req = new request(timeIdx, trackIdx);
-        // cout << req->arrival_time << endl;
         reqList.push_back(req);
     }
     input.close();
@@ -189,7 +289,11 @@ int main(int argc, char **argv) {
     // simulation
     simulation(scheduler);
 
-    // summary
+    // print stats
+    for (int i = 0; i < reqList.size(); i++) {
+        request *req = reqList[i];
+        printf("%5d: %5d %5d %5d\n", i, req->arrival_time, req->start_time, req->end_time);
+    }
     printf("SUM: %d %d %.2lf %.2lf %d\n", 
         stat->total_time, stat->total_movement, stat->avg_turnaround, stat->avg_waittime, stat->max_waittime);
 
