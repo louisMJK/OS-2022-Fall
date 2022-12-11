@@ -42,6 +42,7 @@ stats *stat = new stats();
 
 int time_curr = 0;
 int head = 0;
+int dir = 1;
 
 
 class Scheduler
@@ -104,10 +105,8 @@ public:
         request *req;
         deque<request *>::iterator it = q.begin();
         while (it != q.end() && (*it)->track < head) {
-            // cout << (*it)->track << " ";
             it++;
         }
-        // cout << endl;
 
         if (it == q.begin()) {
             req = *it;
@@ -166,12 +165,80 @@ public:
     Scheduler_SSTF() {};
 };
 
+class Scheduler_LOOK: public Scheduler
+{
+public:
+    deque<request *> q;
+
+    void add_request(request *req) {
+        if (q.empty()) {
+            q.push_back(req);
+        }
+        else {
+            deque<request *>::iterator it = q.begin();
+            while (it != q.end() && (*it)->track <= req->track) {
+                it++;
+            }
+            q.insert(it, req);
+        }
+    }
+
+    request* get_request() {
+        if (q.empty()) {
+            return nullptr;
+        }
+        request *req;
+        deque<request *>::iterator it = q.begin();
+        while (it != q.end() && (*it)->track < head) {
+            it++;
+        }
+        if (it != q.end() && (*it)->track == head) {
+            req = *it;
+            q.erase(it);
+            return req;
+        }
+        if (dir == 1) {
+            if (head <= q.back()->track) {
+                req = *it;
+            }
+            else {
+                dir = -1;
+                it = q.end() - 1;
+                while (it != q.begin() && (*it)->track == (*(it - 1))->track) {
+                    it--;
+                }
+                req = *it;
+            }
+        }
+        else if (dir == -1) {
+            if (head >= q.front()->track) {
+                it--;
+                while (it != q.begin() && (*it)->track == (*(it - 1))->track) {
+                    it--;
+                }
+                req = *it;
+            }
+            else {
+                dir = 1;
+                it = q.begin();
+                req = *it;
+            }
+        }
+        q.erase(it);
+        return req;
+    }
+
+    bool empty() {
+        return q.empty();
+    }
+
+    Scheduler_LOOK() {};
+};
 
 
 void simulation(Scheduler *sched) {
     int reqIdx = 0;
     int numOps = 0;
-    int dir = 1;
     bool active = false;
     request *req_curr = nullptr;
     request *req_new = reqList[reqIdx];
@@ -258,6 +325,9 @@ int main(int argc, char **argv) {
         break;
     case 'j':
         scheduler = new Scheduler_SSTF();
+        break;
+    case 's':
+        scheduler = new Scheduler_LOOK();
         break;
     default:
         break;
